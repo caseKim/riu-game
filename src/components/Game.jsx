@@ -268,13 +268,30 @@ export default function Game({ character, difficulty, onBack }) {
         {character.emoji} {character.name} &nbsp;·&nbsp;
         <span style={{ ...styles.diffBadge, background: difficulty.color }}>{difficulty.emoji} {difficulty.label}</span>
       </p>
-      <div ref={canvasWrapRef} style={styles.canvasWrap} onClick={jump}>
-        <canvas
-          ref={canvasRef}
-          width={W}
-          height={H}
-          style={styles.canvas}
-        />
+      <div ref={canvasWrapRef} style={styles.gameArea} onClick={jump}>
+        <div style={styles.canvasWrap}>
+          <canvas
+            ref={canvasRef}
+            width={W}
+            height={H}
+            style={styles.canvas}
+          />
+        </div>
+
+        <div style={styles.scoreCard}>
+        <div style={styles.scoreRow}>
+          <div style={styles.scoreItem}>
+            <span style={styles.scoreLabel}>점수</span>
+            <span style={styles.score}>{score}</span>
+          </div>
+          <div style={styles.scoreDivider} />
+          <div style={styles.scoreItem}>
+            <span style={styles.scoreLabel}>🏆 최고</span>
+            <span style={styles.best}>{best}</span>
+          </div>
+        </div>
+        <div style={styles.hint}>스페이스바 / 탭으로 점프 &nbsp;·&nbsp; 두 번 누르면 2단 점프 ✨ &nbsp;·&nbsp; 🍎 과일 +10점!</div>
+      </div>
 
         {phase === 'idle' && (
           <Overlay>
@@ -296,22 +313,7 @@ export default function Game({ character, difficulty, onBack }) {
             </div>
           </Overlay>
         )}
-      </div>
-
-      <div style={styles.scoreCard}>
-        <div style={styles.scoreRow}>
-          <div style={styles.scoreItem}>
-            <span style={styles.scoreLabel}>점수</span>
-            <span style={styles.score}>{score}</span>
-          </div>
-          <div style={styles.scoreDivider} />
-          <div style={styles.scoreItem}>
-            <span style={styles.scoreLabel}>🏆 최고</span>
-            <span style={styles.best}>{best}</span>
-          </div>
-        </div>
-        <div style={styles.hint}>스페이스바 / 탭으로 점프 &nbsp;·&nbsp; 두 번 누르면 2단 점프 ✨ &nbsp;·&nbsp; 🍎 과일 +10점!</div>
-      </div>
+    </div>
     </div>
   )
 }
@@ -867,12 +869,15 @@ const styles = {
     padding: '3px 10px',
     borderRadius: 20,
   },
-  canvasWrap: {
+  gameArea: {
     position: 'relative',
-    display: 'block',
     width: '100%',
     maxWidth: W,
     margin: '0 auto',
+  },
+  canvasWrap: {
+    display: 'block',
+    width: '100%',
     marginBottom: 12,
   },
   canvas: {
@@ -892,9 +897,10 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    background: 'rgba(0,0,0,0.62)',
+    background: 'rgba(0,0,0,0.82)',
     borderRadius: 10,
     color: 'white',
+    zIndex: 10,
   },
   oEmoji: { fontSize: 'clamp(36px, 8vw, 64px)' },
   oTitle: { fontSize: 'clamp(20px, 5vw, 38px)', fontWeight: 'bold', marginTop: 8 },
