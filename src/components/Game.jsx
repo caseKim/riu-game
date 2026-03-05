@@ -75,13 +75,11 @@ export default function Game({ character, difficulty, onBack }) {
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.code === 'Space' || e.code === 'ArrowUp') {
+      if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'Tab') {
         e.preventDefault()
         if (phase === 'gameover') {
           if (Date.now() - gameOverAtRef.current < 800) return
-          stateRef.current = makeInitialState()
-          setScore(0)
-          setPhase('playing')
+          restart()
         } else {
           jump()
         }
@@ -89,7 +87,7 @@ export default function Game({ character, difficulty, onBack }) {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [jump, phase])
+  }, [jump, restart, phase])
 
   useEffect(() => {
     const wrap = canvasWrapRef.current
@@ -243,14 +241,14 @@ export default function Game({ character, difficulty, onBack }) {
       }
 
       // 플레이어
-      const p = s.player
-      if (!p.onGround && p.jumpCount === 2) {
+      const player = s.player
+      if (!player.onGround && player.jumpCount === 2) {
         ctx.font = '18px serif'
-        ctx.fillText('✨', p.x + PLAYER_SIZE, p.y + 8)
-        ctx.fillText('✨', p.x - 8, p.y + 22)
+        ctx.fillText('✨', player.x + PLAYER_SIZE, player.y + 8)
+        ctx.fillText('✨', player.x - 8, player.y + 22)
       }
       ctx.font = `${PLAYER_SIZE}px serif`
-      ctx.fillText(character.emoji, p.x, p.y + PLAYER_SIZE)
+      ctx.fillText(character.emoji, player.x, player.y + PLAYER_SIZE)
 
       animRef.current = requestAnimationFrame(loop)
     }
@@ -280,19 +278,19 @@ export default function Game({ character, difficulty, onBack }) {
         </div>
 
         <div style={styles.scoreCard}>
-        <div style={styles.scoreRow}>
-          <div style={styles.scoreItem}>
-            <span style={styles.scoreLabel}>점수</span>
-            <span style={styles.score}>{score}</span>
+          <div style={styles.scoreRow}>
+            <div style={styles.scoreItem}>
+              <span style={styles.scoreLabel}>점수</span>
+              <span style={styles.score}>{score}</span>
+            </div>
+            <div style={styles.scoreDivider} />
+            <div style={styles.scoreItem}>
+              <span style={styles.scoreLabel}>🏆 최고</span>
+              <span style={styles.best}>{best}</span>
+            </div>
           </div>
-          <div style={styles.scoreDivider} />
-          <div style={styles.scoreItem}>
-            <span style={styles.scoreLabel}>🏆 최고</span>
-            <span style={styles.best}>{best}</span>
-          </div>
+          <div style={styles.hint}>스페이스바 / 탭으로 점프 &nbsp;·&nbsp; 두 번 누르면 2단 점프 ✨ &nbsp;·&nbsp; 🍎 과일 +10점!</div>
         </div>
-        <div style={styles.hint}>스페이스바 / 탭으로 점프 &nbsp;·&nbsp; 두 번 누르면 2단 점프 ✨ &nbsp;·&nbsp; 🍎 과일 +10점!</div>
-      </div>
 
         {phase === 'idle' && (
           <Overlay>
@@ -314,7 +312,7 @@ export default function Game({ character, difficulty, onBack }) {
             </div>
           </Overlay>
         )}
-    </div>
+      </div>
     </div>
   )
 }
@@ -830,7 +828,6 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 0,
   },
   topBar: {
     width: '100%',
@@ -877,7 +874,6 @@ const styles = {
     margin: '0 auto',
   },
   canvasWrap: {
-    display: 'block',
     width: '100%',
     marginBottom: 12,
   },
@@ -931,7 +927,6 @@ const styles = {
   },
   scoreCard: {
     width: '100%',
-    maxWidth: W,
     background: '#1e1e2e',
     border: '2px solid #333',
     borderRadius: 14,
