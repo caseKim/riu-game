@@ -22,6 +22,7 @@ export default function Game({ character, difficulty, onBack }) {
   const bestKey = `best_${difficulty.id}`
 
   const canvasRef = useRef(null)
+  const canvasWrapRef = useRef(null)
   const stateRef = useRef(null)
   if (!stateRef.current) stateRef.current = makeInitialState()
   const animRef = useRef(null)
@@ -89,11 +90,11 @@ export default function Game({ character, difficulty, onBack }) {
   }, [jump, phase])
 
   useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
+    const wrap = canvasWrapRef.current
+    if (!wrap) return
     const onTouch = (e) => { e.preventDefault(); jump() }
-    canvas.addEventListener('touchstart', onTouch, { passive: false })
-    return () => canvas.removeEventListener('touchstart', onTouch)
+    wrap.addEventListener('touchstart', onTouch, { passive: false })
+    return () => wrap.removeEventListener('touchstart', onTouch)
   }, [jump])
 
   useEffect(() => {
@@ -256,7 +257,7 @@ export default function Game({ character, difficulty, onBack }) {
         <h1 style={styles.title}>{character.emoji} 점프 게임!</h1>
         <span style={{ ...styles.diffBadge, background: difficulty.color }}>{difficulty.emoji} {difficulty.label}</span>
       </div>
-      <div style={styles.canvasWrap}>
+      <div ref={canvasWrapRef} style={styles.canvasWrap}>
         <canvas
           ref={canvasRef}
           width={W}
