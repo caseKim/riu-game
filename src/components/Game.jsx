@@ -90,6 +90,14 @@ export default function Game({ character, difficulty, onBack }) {
 
   useEffect(() => {
     const canvas = canvasRef.current
+    if (!canvas) return
+    const onTouch = (e) => { e.preventDefault(); jump() }
+    canvas.addEventListener('touchstart', onTouch, { passive: false })
+    return () => canvas.removeEventListener('touchstart', onTouch)
+  }, [jump])
+
+  useEffect(() => {
+    const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
 
     const loop = () => {
@@ -254,7 +262,6 @@ export default function Game({ character, difficulty, onBack }) {
           width={W}
           height={H}
           onClick={jump}
-          onTouchStart={(e) => { e.preventDefault(); jump() }}
           style={styles.canvas}
         />
 
