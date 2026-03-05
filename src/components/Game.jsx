@@ -172,7 +172,7 @@ export default function Game({ character, difficulty, onBack }) {
             p.y + 10 < f.y + f.h &&
             p.y + PLAYER_SIZE - 6 > f.y
           if (collected) {
-            s.score += 3
+            s.score += 10
             s.fruitPopups.push({ x: f.x + f.w / 2, y: f.y, life: 40 })
             return false
           }
@@ -229,8 +229,8 @@ export default function Game({ character, difficulty, onBack }) {
         ctx.fillStyle = '#FFD700'
         ctx.strokeStyle = 'rgba(0,0,0,0.5)'
         ctx.lineWidth = 3
-        ctx.strokeText('+3', fp.x - 14, fp.y)
-        ctx.fillText('+3', fp.x - 14, fp.y)
+        ctx.strokeText('+10', fp.x - 18, fp.y)
+        ctx.fillText('+10', fp.x - 18, fp.y)
         ctx.globalAlpha = 1
       }
 
@@ -292,7 +292,7 @@ export default function Game({ character, difficulty, onBack }) {
         <span style={styles.score}>점수: {score}</span>
         <span style={styles.best}>🏆 최고: {best}</span>
       </div>
-      <div style={styles.hint}>스페이스바 또는 클릭으로 점프 &nbsp;|&nbsp; 두 번 누르면 2단 점프 ✨ &nbsp;|&nbsp; 🍎 과일을 먹으면 +3점!</div>
+      <div style={styles.hint}>스페이스바 또는 클릭으로 점프 &nbsp;|&nbsp; 두 번 누르면 2단 점프 ✨ &nbsp;|&nbsp; 🍎 과일을 먹으면 +10점!</div>
     </div>
   )
 }
