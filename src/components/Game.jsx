@@ -24,6 +24,7 @@ export default function Game({ character, difficulty, onBack }) {
   const canvasRef = useRef(null)
   const canvasWrapRef = useRef(null)
   const stateRef = useRef(null)
+  const gameOverAtRef = useRef(0)
   if (!stateRef.current) stateRef.current = makeInitialState()
   const animRef = useRef(null)
   const [score, setScore] = useState(0)
@@ -77,6 +78,7 @@ export default function Game({ character, difficulty, onBack }) {
       if (e.code === 'Space' || e.code === 'ArrowUp') {
         e.preventDefault()
         if (phase === 'gameover') {
+          if (Date.now() - gameOverAtRef.current < 800) return
           stateRef.current = makeInitialState()
           setScore(0)
           setPhase('playing')
@@ -92,10 +94,14 @@ export default function Game({ character, difficulty, onBack }) {
   useEffect(() => {
     const wrap = canvasWrapRef.current
     if (!wrap) return
-    const onTouch = (e) => { e.preventDefault(); jump() }
+    const onTouch = (e) => {
+      e.preventDefault()
+      if (phase === 'gameover' && Date.now() - gameOverAtRef.current < 800) return
+      jump()
+    }
     wrap.addEventListener('touchstart', onTouch, { passive: false })
     return () => wrap.removeEventListener('touchstart', onTouch)
-  }, [jump])
+  }, [jump, phase])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -202,6 +208,7 @@ export default function Game({ character, difficulty, onBack }) {
               }
               return prev
             })
+            gameOverAtRef.current = Date.now()
             setPhase('gameover')
           }
         }
