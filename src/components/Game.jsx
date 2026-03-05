@@ -7,6 +7,10 @@ const PLAYER_SIZE = 55
 const GRAVITY = 0.65
 const JUMP_FORCE = -15
 
+const FRUITS = ['🍎', '🍊', '🍋', '🍇', '🍓', '🍒']
+// 먹을 수 있는 높이 (너무 어렵지 않게 — 지면~낮은 점프 범위)
+const FRUIT_HEIGHTS = [GROUND_Y - 45, GROUND_Y - 80, GROUND_Y - 120]
+
 const DIFF_SETTINGS = {
   easy:   { baseSpeed: 4, intervalMax: 130, intervalMin: 60, doubleScore: 9999, doubleChance: 0,    maxSpeed: 9  },
   normal: { baseSpeed: 6, intervalMax: 100, intervalMin: 40, doubleScore: 30,   doubleChance: 0.30, maxSpeed: 14 },
@@ -29,6 +33,10 @@ export default function Game({ character, difficulty, onBack }) {
     return {
       player: { x: 120, y: GROUND_Y - PLAYER_SIZE, vy: 0, onGround: true, jumpCount: 0 },
       obstacles: [],
+      fruits: [],
+      fruitTimer: 0,
+      nextFruitInterval: 200 + Math.floor(Math.random() * 100),
+      fruitPopups: [],
       clouds: [
         { x: 160, y: 65, speed: 0.5 },
         { x: 460, y: 48, speed: 0.7 },
@@ -134,12 +142,42 @@ export default function Game({ character, difficulty, onBack }) {
           return o.x + o.w > -30
         })
 
+        // 과일 스폰
+        s.fruitTimer++
+        if (s.fruitTimer >= s.nextFruitInterval) {
+          const emoji = FRUITS[Math.floor(Math.random() * FRUITS.length)]
+          const y = FRUIT_HEIGHTS[Math.floor(Math.random() * FRUIT_HEIGHTS.length)]
+          s.fruits.push({ emoji, x: W + 10, y, w: 38, h: 38, frame: 0 })
+          s.fruitTimer = 0
+          s.nextFruitInterval = 200 + Math.floor(Math.random() * 100)
+        }
+
+        // 과일 이동 및 수집
+        const p = s.player
+        s.fruits = s.fruits.filter((f) => {
+          f.x -= s.speed
+          f.frame++
+          const collected =
+            p.x + 10 < f.x + f.w &&
+            p.x + PLAYER_SIZE - 10 > f.x &&
+            p.y + 10 < f.y + f.h &&
+            p.y + PLAYER_SIZE - 6 > f.y
+          if (collected) {
+            s.score += 3
+            s.fruitPopups.push({ x: f.x + f.w / 2, y: f.y, life: 40 })
+            return false
+          }
+          return f.x + f.w > -10
+        })
+
+        // +3 팝업 업데이트
+        s.fruitPopups = s.fruitPopups.filter(fp => { fp.y -= 1.2; fp.life--; return fp.life > 0 })
+
         // 점수
         s.score += 0.05
         setScore(Math.floor(s.score))
 
         // 충돌 감지
-        const p = s.player
         for (const o of s.obstacles) {
           if (
             p.x + 10 < o.x + o.w - 4 &&
@@ -165,6 +203,26 @@ export default function Game({ character, difficulty, onBack }) {
         ctx.save()
         drawObstacle(ctx, o)
         ctx.restore()
+      }
+
+      // 과일 그리기
+      for (const f of s.fruits) {
+        const bob = Math.sin(f.frame * 0.12) * 4
+        ctx.font = '34px serif'
+        ctx.fillText(f.emoji, f.x, f.y + bob + f.h)
+      }
+
+      // +3 팝업 그리기
+      for (const fp of s.fruitPopups) {
+        const alpha = fp.life / 40
+        ctx.globalAlpha = alpha
+        ctx.font = 'bold 22px sans-serif'
+        ctx.fillStyle = '#FFD700'
+        ctx.strokeStyle = 'rgba(0,0,0,0.5)'
+        ctx.lineWidth = 3
+        ctx.strokeText('+3', fp.x - 14, fp.y)
+        ctx.fillText('+3', fp.x - 14, fp.y)
+        ctx.globalAlpha = 1
       }
 
       // 플레이어
@@ -196,6 +254,7 @@ export default function Game({ character, difficulty, onBack }) {
           width={W}
           height={H}
           onClick={jump}
+          onTouchStart={(e) => { e.preventDefault(); jump() }}
           style={styles.canvas}
         />
 
@@ -225,7 +284,7 @@ export default function Game({ character, difficulty, onBack }) {
         <span style={styles.score}>점수: {score}</span>
         <span style={styles.best}>🏆 최고: {best}</span>
       </div>
-      <div style={styles.hint}>스페이스바 또는 클릭으로 점프 &nbsp;|&nbsp; 두 번 누르면 2단 점프 ✨ &nbsp;|&nbsp; 게임 오버 후 스페이스바로 재시작</div>
+      <div style={styles.hint}>스페이스바 또는 클릭으로 점프 &nbsp;|&nbsp; 두 번 누르면 2단 점프 ✨ &nbsp;|&nbsp; 🍎 과일을 먹으면 +3점!</div>
     </div>
   )
 }
@@ -263,7 +322,7 @@ function makeObstacle(kind) {
     const by = 120 + Math.random() * 110
     return { kind, frame: 0, x: W + 10, y: by, w: 56, h: 40 }
   }
-  if (kind === 'spike')  return { kind, frame: 0, x: W + 10, y: GROUND_Y - 48, w: 69, h: 48 }
+  if (kind === 'spike')  return { kind, frame: 0, x: W + 10, y: GROUND_Y - 62, w: 69, h: 62 }
   // fire
   const h = 55 + Math.random() * 25
   return { kind, frame: 0, x: W + 10, y: GROUND_Y - h, w: 38, h }
@@ -468,8 +527,9 @@ function drawSpike(ctx, o) {
   for (let i = 0; i < count; i++) {
     const bx = o.x + i * sw
     const tipX = bx + sw / 2
-    const tipY = i === 1 ? o.y - 8 : o.y + 4  // 가운데가 가장 높음
+    const tipY = i === 1 ? o.y - 10 : o.y + 10  // 가운데가 가장 높음
     const baseY = o.y + o.h
+    const baseOffset = sw * 0.18  // 밑단을 좁혀 더 뾰족하게
 
     // 크리스탈 그라데이션
     const grad = ctx.createLinearGradient(bx, tipY, bx + sw, baseY)
@@ -479,16 +539,16 @@ function drawSpike(ctx, o) {
     grad.addColorStop(1, '#3A0060')
     ctx.fillStyle = grad
     ctx.beginPath()
-    ctx.moveTo(bx + 4, baseY)
+    ctx.moveTo(bx + baseOffset, baseY)
     ctx.lineTo(tipX, tipY)
-    ctx.lineTo(bx + sw - 4, baseY)
+    ctx.lineTo(bx + sw - baseOffset, baseY)
     ctx.closePath()
     ctx.fill()
 
     // 왼쪽 밝은 면
     ctx.fillStyle = 'rgba(255,255,255,0.28)'
     ctx.beginPath()
-    ctx.moveTo(bx + 4, baseY)
+    ctx.moveTo(bx + baseOffset, baseY)
     ctx.lineTo(tipX, tipY)
     ctx.lineTo(tipX, baseY)
     ctx.closePath()
@@ -733,25 +793,27 @@ const styles = {
   wrapper: {
     textAlign: 'center',
     fontFamily: '"Segoe UI", sans-serif',
-    padding: '20px',
+    padding: 'clamp(8px, 3vw, 20px)',
     background: '#0f0f1e',
     minHeight: '100vh',
+    boxSizing: 'border-box',
   },
   header: {
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 14,
-    marginBottom: 16,
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 10,
   },
   title: {
-    fontSize: 40,
+    fontSize: 'clamp(22px, 5vw, 40px)',
     color: '#FFD700',
     margin: 0,
     textShadow: '0 2px 12px rgba(255,215,0,0.4)',
   },
   diffBadge: {
-    fontSize: 14,
+    fontSize: 'clamp(11px, 2.5vw, 14px)',
     fontWeight: 'bold',
     color: '#111',
     padding: '4px 12px',
@@ -759,7 +821,10 @@ const styles = {
   },
   canvasWrap: {
     position: 'relative',
-    display: 'inline-block',
+    display: 'block',
+    width: '100%',
+    maxWidth: W,
+    margin: '0 auto',
   },
   canvas: {
     cursor: 'pointer',
@@ -767,6 +832,9 @@ const styles = {
     borderRadius: 14,
     display: 'block',
     boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
+    width: '100%',
+    height: 'auto',
+    touchAction: 'none',
   },
   overlay: {
     position: 'absolute',
@@ -779,15 +847,15 @@ const styles = {
     borderRadius: 10,
     color: 'white',
   },
-  oEmoji: { fontSize: 64 },
-  oTitle: { fontSize: 38, fontWeight: 'bold', marginTop: 8 },
-  oHint:  { fontSize: 17, marginTop: 10, opacity: 0.88 },
-  oScore: { fontSize: 28, margin: '10px 0 4px' },
-  oBest:  { fontSize: 18, color: '#FFD700', marginBottom: 4, opacity: 0.9 },
-  btnRow: { display: 'flex', gap: 12, marginTop: 14 },
+  oEmoji: { fontSize: 'clamp(36px, 8vw, 64px)' },
+  oTitle: { fontSize: 'clamp(20px, 5vw, 38px)', fontWeight: 'bold', marginTop: 8 },
+  oHint:  { fontSize: 'clamp(12px, 3vw, 17px)', marginTop: 10, opacity: 0.88, padding: '0 12px', textAlign: 'center' },
+  oScore: { fontSize: 'clamp(18px, 4vw, 28px)', margin: '10px 0 4px' },
+  oBest:  { fontSize: 'clamp(13px, 3vw, 18px)', color: '#FFD700', marginBottom: 4, opacity: 0.9 },
+  btnRow: { display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 12, marginTop: 14 },
   btn: {
-    padding: '14px 28px',
-    fontSize: 20,
+    padding: 'clamp(10px, 2vw, 14px) clamp(16px, 3vw, 28px)',
+    fontSize: 'clamp(14px, 3vw, 20px)',
     borderRadius: 12,
     border: 'none',
     background: '#FFD700',
@@ -797,8 +865,8 @@ const styles = {
     boxShadow: '0 4px 14px rgba(0,0,0,0.35)',
   },
   btnSecondary: {
-    padding: '14px 28px',
-    fontSize: 20,
+    padding: 'clamp(10px, 2vw, 14px) clamp(16px, 3vw, 28px)',
+    fontSize: 'clamp(14px, 3vw, 20px)',
     borderRadius: 12,
     border: '2px solid #aaa',
     background: 'transparent',
@@ -809,24 +877,25 @@ const styles = {
   scoreRow: {
     display: 'flex',
     justifyContent: 'center',
-    gap: 40,
-    marginTop: 14,
+    gap: 'clamp(16px, 5vw, 40px)',
+    marginTop: 10,
   },
   score: {
-    fontSize: 30,
+    fontSize: 'clamp(18px, 4vw, 30px)',
     fontWeight: 'bold',
     color: '#FFD700',
     textShadow: '0 2px 8px rgba(255,215,0,0.3)',
   },
   best: {
-    fontSize: 30,
+    fontSize: 'clamp(18px, 4vw, 30px)',
     fontWeight: 'bold',
     color: '#FFA500',
     textShadow: '0 2px 8px rgba(255,165,0,0.3)',
   },
   hint: {
-    fontSize: 14,
+    fontSize: 'clamp(11px, 2.5vw, 14px)',
     color: '#888',
     marginTop: 6,
+    padding: '0 8px',
   },
 }
