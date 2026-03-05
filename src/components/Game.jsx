@@ -95,6 +95,7 @@ export default function Game({ character, difficulty, onBack }) {
     const wrap = canvasWrapRef.current
     if (!wrap) return
     const onTouch = (e) => {
+      if (e.target.tagName === 'BUTTON') return
       e.preventDefault()
       if (phase === 'gameover' && Date.now() - gameOverAtRef.current < 800) return
       jump()
