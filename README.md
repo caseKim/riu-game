@@ -1,16 +1,30 @@
-# React + Vite
+# 점프 게임!
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+아이와 함께 만든 캐릭터 점프 게임입니다.
 
-Currently, two official plugins are available:
+## 플레이 방법
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+- **점프**: 스페이스바, 방향키(위), 또는 화면 탭/클릭
+- **2단 점프**: 공중에서 한 번 더 누르기
+- **과일 먹기**: 날아오는 과일에 닿으면 +10점
+- **게임 오버 후 재시작**: 스페이스바 또는 화면 탭 (0.8초 후 활성화)
 
-## React Compiler
+## 기능
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- 캐릭터 16종 (동물 8종 · 영웅 8종)
+- 난이도 3단계 (쉬움 / 보통 / 어려움), 난이도별 최고 점수 저장
+- 장애물 5종: 바위, 선인장, 새, 크리스탈 가시, 불꽃
+- 수집 아이템: 과일 6종 (+10점)
+- 점수에 따라 배경 변화 (낮 → 노을 → 밤)
+- 모바일 반응형 (터치 지원)
 
-## Expanding the ESLint configuration
+## 개발
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm run build
+npm run lint
+```
+
+React + Vite로 제작되었습니다.

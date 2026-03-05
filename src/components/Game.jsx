@@ -260,16 +260,19 @@ export default function Game({ character, difficulty, onBack }) {
 
   return (
     <div style={styles.wrapper}>
-      <div style={styles.header}>
-        <h1 style={styles.title}>{character.emoji} 점프 게임!</h1>
-        <span style={{ ...styles.diffBadge, background: difficulty.color }}>{difficulty.emoji} {difficulty.label}</span>
+      <div style={styles.topBar}>
+        <button onClick={onBack} style={styles.backBtn}>← 뒤로</button>
       </div>
-      <div ref={canvasWrapRef} style={styles.canvasWrap}>
+      <h1 style={styles.title}>🎮 점프 게임!</h1>
+      <p style={styles.subtitle}>
+        {character.emoji} {character.name} &nbsp;·&nbsp;
+        <span style={{ ...styles.diffBadge, background: difficulty.color }}>{difficulty.emoji} {difficulty.label}</span>
+      </p>
+      <div ref={canvasWrapRef} style={styles.canvasWrap} onClick={jump}>
         <canvas
           ref={canvasRef}
           width={W}
           height={H}
-          onClick={jump}
           style={styles.canvas}
         />
 
@@ -295,11 +298,20 @@ export default function Game({ character, difficulty, onBack }) {
         )}
       </div>
 
-      <div style={styles.scoreRow}>
-        <span style={styles.score}>점수: {score}</span>
-        <span style={styles.best}>🏆 최고: {best}</span>
+      <div style={styles.scoreCard}>
+        <div style={styles.scoreRow}>
+          <div style={styles.scoreItem}>
+            <span style={styles.scoreLabel}>점수</span>
+            <span style={styles.score}>{score}</span>
+          </div>
+          <div style={styles.scoreDivider} />
+          <div style={styles.scoreItem}>
+            <span style={styles.scoreLabel}>🏆 최고</span>
+            <span style={styles.best}>{best}</span>
+          </div>
+        </div>
+        <div style={styles.hint}>스페이스바 / 탭으로 점프 &nbsp;·&nbsp; 두 번 누르면 2단 점프 ✨ &nbsp;·&nbsp; 🍎 과일 +10점!</div>
       </div>
-      <div style={styles.hint}>스페이스바 또는 클릭으로 점프 &nbsp;|&nbsp; 두 번 누르면 2단 점프 ✨ &nbsp;|&nbsp; 🍎 과일을 먹으면 +10점!</div>
     </div>
   )
 }
@@ -806,32 +818,53 @@ function drawCloud(ctx, x, y, color = 'rgba(255,255,255,0.88)') {
 
 const styles = {
   wrapper: {
-    textAlign: 'center',
     fontFamily: '"Segoe UI", sans-serif',
-    padding: 'clamp(8px, 3vw, 20px)',
+    padding: 'clamp(12px, 4vw, 24px)',
     background: '#0f0f1e',
     minHeight: '100vh',
     boxSizing: 'border-box',
-  },
-  header: {
     display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 10,
+    gap: 0,
+  },
+  topBar: {
+    width: '100%',
+    maxWidth: W,
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  backBtn: {
+    fontSize: 'clamp(12px, 2.5vw, 14px)',
+    fontWeight: 'bold',
+    padding: '6px 14px',
+    borderRadius: 20,
+    border: '2px solid #444',
+    background: 'transparent',
+    color: '#aaa',
+    cursor: 'pointer',
   },
   title: {
-    fontSize: 'clamp(22px, 5vw, 40px)',
+    fontSize: 'clamp(26px, 7vw, 44px)',
     color: '#FFD700',
-    margin: 0,
-    textShadow: '0 2px 12px rgba(255,215,0,0.4)',
+    margin: '0 0 8px',
+    textShadow: '0 2px 14px rgba(255,215,0,0.4)',
+  },
+  subtitle: {
+    fontSize: 'clamp(14px, 3.5vw, 18px)',
+    color: '#aaa',
+    margin: '0 0 14px',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 8,
   },
   diffBadge: {
-    fontSize: 'clamp(11px, 2.5vw, 14px)',
+    fontSize: 'clamp(11px, 2.5vw, 13px)',
     fontWeight: 'bold',
     color: '#111',
-    padding: '4px 12px',
+    padding: '3px 10px',
     borderRadius: 20,
   },
   canvasWrap: {
@@ -840,6 +873,7 @@ const styles = {
     width: '100%',
     maxWidth: W,
     margin: '0 auto',
+    marginBottom: 12,
   },
   canvas: {
     cursor: 'pointer',
@@ -869,48 +903,74 @@ const styles = {
   oBest:  { fontSize: 'clamp(13px, 3vw, 18px)', color: '#FFD700', marginBottom: 4, opacity: 0.9 },
   btnRow: { display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 12, marginTop: 14 },
   btn: {
-    padding: 'clamp(10px, 2vw, 14px) clamp(16px, 3vw, 28px)',
-    fontSize: 'clamp(14px, 3vw, 20px)',
-    borderRadius: 12,
+    padding: 'clamp(10px, 2vw, 14px) clamp(20px, 4vw, 36px)',
+    fontSize: 'clamp(15px, 3.5vw, 20px)',
+    borderRadius: 14,
     border: 'none',
-    background: '#FFD700',
+    background: 'linear-gradient(135deg, #FFD700, #FFA500)',
     cursor: 'pointer',
     fontWeight: 'bold',
-    color: '#333',
-    boxShadow: '0 4px 14px rgba(0,0,0,0.35)',
+    color: '#222',
+    boxShadow: '0 4px 20px rgba(255,165,0,0.4)',
   },
   btnSecondary: {
-    padding: 'clamp(10px, 2vw, 14px) clamp(16px, 3vw, 28px)',
-    fontSize: 'clamp(14px, 3vw, 20px)',
-    borderRadius: 12,
-    border: '2px solid #aaa',
+    padding: 'clamp(10px, 2vw, 14px) clamp(20px, 4vw, 36px)',
+    fontSize: 'clamp(15px, 3.5vw, 20px)',
+    borderRadius: 14,
+    border: '2px solid #444',
     background: 'transparent',
     cursor: 'pointer',
     fontWeight: 'bold',
-    color: '#ddd',
+    color: '#aaa',
+  },
+  scoreCard: {
+    width: '100%',
+    maxWidth: W,
+    background: '#1e1e2e',
+    border: '2px solid #333',
+    borderRadius: 14,
+    padding: 'clamp(10px, 2vw, 14px) clamp(16px, 3vw, 24px)',
+    boxSizing: 'border-box',
   },
   scoreRow: {
     display: 'flex',
     justifyContent: 'center',
+    alignItems: 'center',
     gap: 'clamp(16px, 5vw, 40px)',
-    marginTop: 10,
+  },
+  scoreItem: {
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 2,
+  },
+  scoreLabel: {
+    fontSize: 'clamp(11px, 2vw, 13px)',
+    color: '#777',
+    fontWeight: 'bold',
+  },
+  scoreDivider: {
+    width: 2,
+    height: 36,
+    background: '#333',
+    borderRadius: 2,
   },
   score: {
-    fontSize: 'clamp(18px, 4vw, 30px)',
+    fontSize: 'clamp(22px, 5vw, 34px)',
     fontWeight: 'bold',
     color: '#FFD700',
     textShadow: '0 2px 8px rgba(255,215,0,0.3)',
   },
   best: {
-    fontSize: 'clamp(18px, 4vw, 30px)',
+    fontSize: 'clamp(22px, 5vw, 34px)',
     fontWeight: 'bold',
     color: '#FFA500',
     textShadow: '0 2px 8px rgba(255,165,0,0.3)',
   },
   hint: {
-    fontSize: 'clamp(11px, 2.5vw, 14px)',
-    color: '#888',
-    marginTop: 6,
-    padding: '0 8px',
+    fontSize: 'clamp(10px, 2vw, 13px)',
+    color: '#555',
+    marginTop: 8,
+    textAlign: 'center',
   },
 }
