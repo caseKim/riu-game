@@ -39,6 +39,43 @@ function makeFood() {
 
 const IS_TOUCH = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
 
+// ── Difficulty settings ───────────────────────────────────────────────────────
+const DIFFICULTIES = [
+  {
+    id: 'easy',
+    label: '쉬움',
+    emoji: '🌱',
+    color: '#4CAF50',
+    speed: 1.8,
+    foodCount: 550,
+    aiChaseRange: 240,
+    aiFleeRange: 180,
+    aiTimerMin: 45, aiTimerMax: 110,
+  },
+  {
+    id: 'normal',
+    label: '보통',
+    emoji: '⚡',
+    color: '#2196F3',
+    speed: 2.5,
+    foodCount: 400,
+    aiChaseRange: 380,
+    aiFleeRange: 320,
+    aiTimerMin: 25, aiTimerMax: 70,
+  },
+  {
+    id: 'hard',
+    label: '어려움',
+    emoji: '🔥',
+    color: '#FF5722',
+    speed: 3.3,
+    foodCount: 260,
+    aiChaseRange: 500,
+    aiFleeRange: 420,
+    aiTimerMin: 12, aiTimerMax: 40,
+  },
+]
+
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function SnakeGame({ onBack }) {
   const canvasRef = useRef(null)
@@ -53,34 +90,47 @@ export default function SnakeGame({ onBack }) {
 
   const [phase, setPhase] = useState('idle')
   const [score, setScore] = useState(0)
-  const [best, setBest] = useState(() => Number(localStorage.getItem('snake_best') || 0))
+  const [difficulty, setDifficulty] = useState(() => {
+    const saved = localStorage.getItem('snake_diff')
+    return DIFFICULTIES.find(d => d.id === saved) ?? DIFFICULTIES[1]
+  })
+  const [best, setBest] = useState(() => Number(localStorage.getItem(`snake_best_${localStorage.getItem('snake_diff') || 'normal'}`) || 0))
   const [aliveCount, setAliveCount] = useState(NUM_AI + 1)
   const [playerLen, setPlayerLen] = useState(INIT_LEN)
   const [playerColor, setPlayerColor] = useState(() => localStorage.getItem('snake_color') || '#FFD700')
 
+  useEffect(() => {
+    setBest(Number(localStorage.getItem(`snake_best_${difficulty.id}`) || 0))
+  }, [difficulty.id])
+
   // ── Init ──────────────────────────────────────────────────────────────────
-  function initState(color) {
+  function initState(color, diff) {
     const snakes = []
     const usedColors = new Set([color])
     snakes.push(makeSnake(W_W / 2, W_H / 2, INIT_LEN, color, true))
 
     const aiColors = COLORS.filter(c => !usedColors.has(c))
     for (let i = 0; i < NUM_AI; i++) {
-      const color = aiColors[i % aiColors.length]
-      snakes.push(makeSnake(rand(120, W_W - 120), rand(120, W_H - 120), randInt(5, 22), color, false))
+      const c = aiColors[i % aiColors.length]
+      snakes.push(makeSnake(rand(120, W_W - 120), rand(120, W_H - 120), randInt(5, 22), c, false))
     }
 
-    const foods = Array.from({ length: FOOD_COUNT }, makeFood)
-    return { snakes, foods, frame: 0, score: 0 }
+    const foods = Array.from({ length: diff.foodCount }, makeFood)
+    return { snakes, foods, frame: 0, score: 0, diff }
   }
 
   const startGame = useCallback(() => {
-    stateRef.current = initState(playerColor)
+    stateRef.current = initState(playerColor, difficulty)
     setScore(0)
     setPlayerLen(INIT_LEN)
     setAliveCount(NUM_AI + 1)
     setPhase('playing')
-  }, [playerColor])
+  }, [playerColor, difficulty])
+
+  const pickDifficulty = useCallback((diff) => {
+    setDifficulty(diff)
+    localStorage.setItem('snake_diff', diff.id)
+  }, [])
 
   const pickColor = useCallback((color) => {
     setPlayerColor(color)
@@ -164,19 +214,20 @@ export default function SnakeGame({ onBack }) {
         if (!sn.isPlayer) {
           sn.aiTimer--
           if (sn.aiTimer <= 0) {
-            sn.aiTimer = randInt(25, 70)
+            sn.aiTimer = randInt(s.diff.aiTimerMin, s.diff.aiTimerMax)
             const head = sn.segs[0]
             const myLen = sn.segs.length
             let chaseTarget = null, chaseDist = Infinity
             let fleeTarget = null, fleeDist = Infinity
+            const chaseR = s.diff.aiChaseRange, fleeR = s.diff.aiFleeRange
 
             for (const other of s.snakes) {
               if (!other.alive || other === sn) continue
               const d2 = dist2(head, other.segs[0])
-              if (other.segs.length < myLen * 0.85 && d2 < 380 * 380) {
+              if (other.segs.length < myLen * 0.85 && d2 < chaseR * chaseR) {
                 if (d2 < chaseDist) { chaseDist = d2; chaseTarget = other }
               }
-              if (other.segs.length > myLen * 1.15 && d2 < 320 * 320) {
+              if (other.segs.length > myLen * 1.15 && d2 < fleeR * fleeR) {
                 if (d2 < fleeDist) { fleeDist = d2; fleeTarget = other }
               }
             }
@@ -207,8 +258,9 @@ export default function SnakeGame({ onBack }) {
 
         // Move head
         const head = sn.segs[0]
-        const nx = Math.max(SEG_R, Math.min(W_W - SEG_R, head.x + Math.cos(sn.angle) * SPEED))
-        const ny = Math.max(SEG_R, Math.min(W_H - SEG_R, head.y + Math.sin(sn.angle) * SPEED))
+        const spd = s.diff.speed
+        const nx = Math.max(SEG_R, Math.min(W_W - SEG_R, head.x + Math.cos(sn.angle) * spd))
+        const ny = Math.max(SEG_R, Math.min(W_H - SEG_R, head.y + Math.sin(sn.angle) * spd))
         sn.segs.unshift({ x: nx, y: ny })
         while (sn.segs.length > sn.targetLen) sn.segs.pop()
       }
@@ -280,9 +332,11 @@ export default function SnakeGame({ onBack }) {
       const playerSnake = s.snakes.find(sn => sn.isPlayer)
       if (playerSnake && !playerSnake.alive) {
         const finalScore = s.score
-        const newBest = Math.max(finalScore, best)
-        if (newBest > best) {
-          localStorage.setItem('snake_best', newBest)
+        const bestKey = `snake_best_${s.diff.id}`
+        const prevBest = Number(localStorage.getItem(bestKey) || 0)
+        const newBest = Math.max(finalScore, prevBest)
+        if (newBest > prevBest) {
+          localStorage.setItem(bestKey, newBest)
           setBest(newBest)
         }
         setScore(finalScore)
@@ -520,7 +574,7 @@ export default function SnakeGame({ onBack }) {
         <div style={s.hud}>
           <div style={s.hudScore}>점수 {score}</div>
           <div style={s.hudInfo}>길이 {playerLen} · 생존 {aliveCount}/{NUM_AI + 1}</div>
-          <div style={s.hudBest}>최고 {best}</div>
+          <div style={s.hudBest}>최고 {best} · {difficulty.emoji} {difficulty.label}</div>
         </div>
       )}
 
@@ -553,7 +607,26 @@ export default function SnakeGame({ onBack }) {
               <p>나보다 큰 뱀은 조심하세요 위험해요!</p>
             </div>
             <div>
-              <div style={s.colorLabel}>내 뱀 색깔 고르기</div>
+              <div style={s.colorLabel}>난이도</div>
+              <div style={s.diffRow}>
+                {DIFFICULTIES.map(d => (
+                  <button
+                    key={d.id}
+                    onClick={() => pickDifficulty(d)}
+                    style={{
+                      ...s.diffBtn,
+                      borderColor: difficulty.id === d.id ? d.color : '#444',
+                      color: difficulty.id === d.id ? d.color : '#888',
+                      background: difficulty.id === d.id ? `${d.color}22` : 'transparent',
+                    }}
+                  >
+                    {d.emoji} {d.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div>
+              <div style={s.colorLabel}>내 뱀 색깔</div>
               <div style={s.colorGrid}>
                 {['#FFD700', ...COLORS].map(c => (
                   <button
@@ -586,6 +659,25 @@ export default function SnakeGame({ onBack }) {
             {score > 0 && score >= best && (
               <div style={s.newBest}>최고 기록!</div>
             )}
+            <div>
+              <div style={s.colorLabel}>난이도</div>
+              <div style={s.diffRow}>
+                {DIFFICULTIES.map(d => (
+                  <button
+                    key={d.id}
+                    onClick={() => pickDifficulty(d)}
+                    style={{
+                      ...s.diffBtn,
+                      borderColor: difficulty.id === d.id ? d.color : '#444',
+                      color: difficulty.id === d.id ? d.color : '#888',
+                      background: difficulty.id === d.id ? `${d.color}22` : 'transparent',
+                    }}
+                  >
+                    {d.emoji} {d.label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div>
               <div style={s.colorLabel}>색깔 바꾸기</div>
               <div style={s.colorGrid}>
@@ -723,6 +815,22 @@ const s = {
     width: 130,
     height: 130,
     pointerEvents: 'none',
+  },
+  diffRow: {
+    display: 'flex',
+    gap: 8,
+    justifyContent: 'center',
+  },
+  diffBtn: {
+    flex: 1,
+    padding: '8px 4px',
+    borderRadius: 10,
+    border: '2px solid #444',
+    background: 'transparent',
+    fontSize: 'clamp(12px, 2.5vw, 14px)',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    transition: 'all 0.15s',
   },
   colorLabel: {
     color: '#aaa',
