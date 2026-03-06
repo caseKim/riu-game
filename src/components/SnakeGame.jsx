@@ -657,7 +657,7 @@ export default function SnakeGame({ onBack }) {
                 ))}
               </div>
             </div>
-            <button style={{ ...s.btnPrimary, background: playerColor }} onClick={startGame}>
+            <button style={s.btnPrimary} onClick={startGame}>
               시작하기
             </button>
             <button style={s.btnBack} onClick={onBack}>← 게임 선택</button>
@@ -712,7 +712,7 @@ export default function SnakeGame({ onBack }) {
                 ))}
               </div>
             </div>
-            <button style={{ ...s.btnPrimary, background: playerColor }} onClick={startGame}>다시 하기</button>
+            <button style={s.btnPrimary} onClick={startGame}>다시 하기</button>
             <button style={s.btnBack} onClick={onBack}>← 게임 선택</button>
           </div>
         </div>
@@ -878,6 +878,7 @@ const s = {
     outlineOffset: 2,
   },
   btnPrimary: {
+    background: 'linear-gradient(135deg, #FFD700, #FFA500)',
     color: '#1a1a2e',
     border: 'none',
     borderRadius: 14,
@@ -885,6 +886,7 @@ const s = {
     fontSize: 'clamp(15px, 3vw, 18px)',
     fontWeight: 'bold',
     cursor: 'pointer',
+    boxShadow: '0 4px 20px rgba(255,165,0,0.4)',
   },
   btnBack: {
     background: 'transparent',
@@ -895,6 +897,7 @@ const s = {
     fontSize: 'clamp(13px, 2.5vw, 15px)',
     fontWeight: 'bold',
     cursor: 'pointer',
+    marginTop: -8,
   },
   joyBase: {
     width: 130,

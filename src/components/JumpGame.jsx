@@ -307,8 +307,10 @@ export default function Game({ character, difficulty, onBack }) {
             <div style={styles.bigScore}>{score}점</div>
             <div style={styles.bestScore}>최고 {best}점</div>
             {score >= best && <div style={styles.newBest}>🎉 최고 기록!</div>}
-            <button onClick={restart} style={styles.btn}>다시 시작</button>
-            <button onClick={onBack} style={styles.btnSecondary}>← 나가기</button>
+            <div style={styles.btnGroup}>
+              <button onClick={restart} style={styles.btn}>다시 시작</button>
+              <button onClick={onBack} style={styles.btnSecondary}>← 나가기</button>
+            </div>
           </Overlay>
         )}
       </div>
@@ -908,10 +910,15 @@ const styles = {
     textAlign: 'center',
     display: 'flex',
     flexDirection: 'column',
-    alignItems: 'center',
     gap: 10,
     maxWidth: 340,
     width: '90%',
+  },
+  btnGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+    width: '100%',
   },
   oEmoji: { fontSize: 'clamp(36px, 8vw, 56px)' },
   oTitle: {
@@ -936,8 +943,8 @@ const styles = {
     boxShadow: '0 4px 20px rgba(255,165,0,0.4)',
   },
   btnSecondary: {
-    padding: 'clamp(10px, 2vw, 14px) clamp(20px, 4vw, 36px)',
-    fontSize: 'clamp(15px, 3.5vw, 20px)',
+    padding: 'clamp(8px, 1.5vw, 10px) clamp(16px, 3vw, 24px)',
+    fontSize: 'clamp(13px, 2.5vw, 15px)',
     borderRadius: 14,
     border: '2px solid #444',
     background: 'transparent',
