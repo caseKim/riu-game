@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import GameSelect from './components/GameSelect'
-import CharacterSelect from './components/CharacterSelect'
-import Game from './components/Game'
+import JumpCharacterSelect from './components/JumpCharacterSelect'
+import JumpGame from './components/JumpGame'
 import SnakeGame from './components/SnakeGame'
 
 export default function App() {
@@ -17,11 +17,11 @@ export default function App() {
   }
 
   if (!selection) {
-    return <CharacterSelect onSelect={setSelection} onBack={() => setGameId(null)} />
+    return <JumpCharacterSelect onSelect={setSelection} onBack={() => setGameId(null)} />
   }
 
   return (
-    <Game
+    <JumpGame
       character={selection.character}
       difficulty={selection.difficulty}
       onBack={() => setSelection(null)}

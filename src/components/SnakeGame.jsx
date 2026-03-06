@@ -660,7 +660,7 @@ export default function SnakeGame({ onBack }) {
             <button style={{ ...s.btnPrimary, background: playerColor }} onClick={startGame}>
               시작하기
             </button>
-            <button style={s.btnBack} onClick={onBack}>← 돌아가기</button>
+            <button style={s.btnBack} onClick={onBack}>← 게임 선택</button>
           </div>
         </div>
       )}
@@ -669,7 +669,8 @@ export default function SnakeGame({ onBack }) {
       {phase === 'gameover' && (
         <div style={s.overlay}>
           <div style={s.box}>
-            <div style={s.title}>게임 오버</div>
+            <div style={s.oEmoji}>{score > 0 && score >= best ? '🏆' : '😵'}</div>
+            <div style={s.title}>{score > 0 && score >= best ? '신기록!' : '게임 오버'}</div>
             <div style={s.bigScore}>{score}점</div>
             <div style={s.bestScore}>최고 {best}점</div>
             {score > 0 && score >= best && (
@@ -712,7 +713,7 @@ export default function SnakeGame({ onBack }) {
               </div>
             </div>
             <button style={{ ...s.btnPrimary, background: playerColor }} onClick={startGame}>다시 하기</button>
-            <button style={s.btnBack} onClick={onBack}>← 돌아가기</button>
+            <button style={s.btnBack} onClick={onBack}>← 게임 선택</button>
           </div>
         </div>
       )}
@@ -726,7 +727,7 @@ const s = {
     width: '100vw',
     height: '100vh',
     overflow: 'hidden',
-    background: '#0d1117',
+    background: '#0f0f1e',
     fontFamily: '"Segoe UI", sans-serif',
     touchAction: 'none',
   },
@@ -790,9 +791,10 @@ const s = {
     maxWidth: 340,
     width: '90%',
   },
+  oEmoji: { fontSize: 'clamp(36px, 8vw, 56px)' },
   title: {
     color: '#FFD700',
-    fontSize: 'clamp(26px, 6vw, 36px)',
+    fontSize: 'clamp(22px, 5vw, 34px)',
     fontWeight: 'bold',
     textShadow: '0 2px 18px rgba(255,215,0,0.4)',
   },
@@ -878,19 +880,20 @@ const s = {
   btnPrimary: {
     color: '#1a1a2e',
     border: 'none',
-    borderRadius: 10,
-    padding: '12px 32px',
+    borderRadius: 14,
+    padding: 'clamp(10px, 2vw, 14px) clamp(20px, 4vw, 36px)',
     fontSize: 'clamp(15px, 3vw, 18px)',
     fontWeight: 'bold',
     cursor: 'pointer',
   },
   btnBack: {
     background: 'transparent',
-    color: '#888',
-    border: '1px solid #444',
-    borderRadius: 10,
-    padding: '8px 20px',
+    color: '#aaa',
+    border: '2px solid #444',
+    borderRadius: 14,
+    padding: 'clamp(8px, 1.5vw, 10px) clamp(16px, 3vw, 24px)',
     fontSize: 'clamp(13px, 2.5vw, 15px)',
+    fontWeight: 'bold',
     cursor: 'pointer',
   },
   joyBase: {

@@ -260,7 +260,7 @@ export default function Game({ character, difficulty, onBack }) {
   return (
     <div style={styles.wrapper}>
       <div style={styles.topBar}>
-        <button onClick={onBack} style={styles.backBtn}>← 뒤로</button>
+        <button onClick={onBack} style={styles.backBtn}>← 나가기</button>
       </div>
       <h1 style={styles.title}>🎮 점프 게임!</h1>
       <p style={styles.subtitle}>
@@ -304,12 +304,11 @@ export default function Game({ character, difficulty, onBack }) {
           <Overlay>
             <div style={styles.oEmoji}>{score >= best ? '🏆' : '😵'}</div>
             <div style={styles.oTitle}>{score >= best ? '신기록!' : '게임 오버!'}</div>
-            <div style={styles.oScore}>점수: {score}</div>
-            <div style={styles.oBest}>🏆 최고 점수: {best}</div>
-            <div style={styles.btnRow}>
-              <button onClick={restart} style={styles.btn}>다시 시작 🔄</button>
-              <button onClick={onBack} style={styles.btnSecondary}>캐릭터 변경 🐾</button>
-            </div>
+            <div style={styles.bigScore}>{score}점</div>
+            <div style={styles.bestScore}>최고 {best}점</div>
+            {score >= best && <div style={styles.newBest}>🎉 최고 기록!</div>}
+            <button onClick={restart} style={styles.btn}>다시 시작</button>
+            <button onClick={onBack} style={styles.btnSecondary}>← 나가기</button>
           </Overlay>
         )}
       </div>
@@ -318,7 +317,11 @@ export default function Game({ character, difficulty, onBack }) {
 }
 
 function Overlay({ children }) {
-  return <div style={styles.overlay}>{children}</div>
+  return (
+    <div style={styles.overlay}>
+      <div style={styles.overlayBox}>{children}</div>
+    </div>
+  )
 }
 
 // ─── 장애물 로직 ────────────────────────────────────────────
@@ -891,19 +894,36 @@ const styles = {
     position: 'fixed',
     inset: 0,
     display: 'flex',
-    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     background: 'rgba(0,0,0,0.72)',
     color: 'white',
     zIndex: 100,
   },
-  oEmoji: { fontSize: 'clamp(36px, 8vw, 64px)' },
-  oTitle: { fontSize: 'clamp(20px, 5vw, 38px)', fontWeight: 'bold', marginTop: 8 },
-  oHint:  { fontSize: 'clamp(12px, 3vw, 17px)', marginTop: 10, opacity: 0.88, padding: '0 12px', textAlign: 'center' },
-  oScore: { fontSize: 'clamp(18px, 4vw, 28px)', margin: '10px 0 4px' },
-  oBest:  { fontSize: 'clamp(13px, 3vw, 18px)', color: '#FFD700', marginBottom: 4, opacity: 0.9 },
-  btnRow: { display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: 12, marginTop: 14 },
+  overlayBox: {
+    background: '#1e1e2e',
+    border: '2px solid #333',
+    borderRadius: 18,
+    padding: 'clamp(24px, 5vw, 40px) clamp(28px, 6vw, 48px)',
+    textAlign: 'center',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 10,
+    maxWidth: 340,
+    width: '90%',
+  },
+  oEmoji: { fontSize: 'clamp(36px, 8vw, 56px)' },
+  oTitle: {
+    fontSize: 'clamp(22px, 5vw, 34px)',
+    fontWeight: 'bold',
+    color: '#FFD700',
+    textShadow: '0 2px 18px rgba(255,215,0,0.4)',
+  },
+  oHint:  { fontSize: 'clamp(12px, 3vw, 17px)', opacity: 0.88, padding: '0 12px', textAlign: 'center' },
+  bigScore: { color: '#fff', fontSize: 'clamp(28px, 6vw, 40px)', fontWeight: 'bold' },
+  bestScore: { color: 'rgba(255,255,255,0.45)', fontSize: 'clamp(12px, 2.5vw, 15px)' },
+  newBest: { color: '#FFD700', fontSize: 'clamp(14px, 3vw, 18px)', fontWeight: 'bold' },
   btn: {
     padding: 'clamp(10px, 2vw, 14px) clamp(20px, 4vw, 36px)',
     fontSize: 'clamp(15px, 3.5vw, 20px)',

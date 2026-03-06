@@ -23,8 +23,8 @@ React + Vite single-page app with two games. No routing — screen transitions a
 App
  ├── GameSelect          (gameId === null)
  ├── SnakeGame           (gameId === 'snake')
- └── CharacterSelect     (gameId === 'jump', selection === null)
-       └── Game          (selection !== null)
+ └── JumpCharacterSelect (gameId === 'jump', selection === null)
+       └── JumpGame      (selection !== null)
              props: { character, difficulty, onBack }
 ```
 
@@ -38,7 +38,7 @@ App
 
 All state is local React state — no global store. Game physics live in `stateRef` (plain mutable object accessed inside `requestAnimationFrame`) to avoid re-renders every frame. `useState` is only used for `score`, `best`, and `phase` (UI-visible values).
 
-Key refs in `Game.jsx`:
+Key refs in `JumpGame.jsx`:
 - `stateRef` — all physics/game state (player, obstacles, fruits, speed, score, frame)
 - `canvasRef` — the `<canvas>` element
 - `canvasWrapRef` — the wrapper div; touch and click handlers are attached here (not on canvas) so overlays don't block input
