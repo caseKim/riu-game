@@ -448,10 +448,12 @@ export default function SnakeGame({ onBack }) {
             ctx.textAlign = 'center'
             ctx.fillText('👑', hx, hy - hr - 16)
           }
-          ctx.fillStyle = sn.isPlayer ? '#FFD700' : 'rgba(255,255,255,0.75)'
+          const playerLen = pSn ? pSn.segs.length : 0
+          const isDanger = !sn.isPlayer && sn.segs.length > playerLen
+          ctx.fillStyle = sn.isPlayer ? '#FFD700' : isDanger ? '#FF4444' : 'rgba(255,255,255,0.75)'
           ctx.font = `bold ${sn.isPlayer ? 12 : 10}px monospace`
           ctx.textAlign = 'center'
-          ctx.fillText(sn.segs.length, hx, hy - hr - (sn === longestSn ? 4 : 4))
+          ctx.fillText(sn.segs.length, hx, hy - hr - 4)
         }
       }
 
