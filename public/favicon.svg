@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <circle cx="50" cy="50" r="50" fill="#0f0f1e"/>
+  <!-- Controller body -->
+  <rect x="18" y="35" width="64" height="36" rx="18" fill="#FFD700"/>
+  <!-- Left grip -->
+  <ellipse cx="28" cy="65" rx="12" ry="10" fill="#FFD700"/>
+  <!-- Right grip -->
+  <ellipse cx="72" cy="65" rx="12" ry="10" fill="#FFD700"/>
+  <!-- D-pad vertical -->
+  <rect x="29" y="44" width="6" height="16" rx="2" fill="#0f0f1e"/>
+  <!-- D-pad horizontal -->
+  <rect x="24" y="49" width="16" height="6" rx="2" fill="#0f0f1e"/>
+  <!-- Buttons -->
+  <circle cx="63" cy="46" r="4" fill="#FF6B6B"/>
+  <circle cx="72" cy="51" r="4" fill="#4ECDC4"/>
+  <circle cx="63" cy="56" r="4" fill="#A8E063"/>
+  <circle cx="54" cy="51" r="4" fill="#FFD700" stroke="#0f0f1e" stroke-width="1.5"/>
+</svg>
