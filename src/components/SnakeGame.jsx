@@ -49,6 +49,7 @@ export default function SnakeGame({ onBack }) {
   const pointerRef = useRef(null) // canvas-space {x, y}
   const joyRef = useRef({ active: false, cx: 0, cy: 0, dx: 0, dy: 0 })
   const joyKnobRef = useRef(null)
+  const joyContainerRef = useRef(null)
 
   const [phase, setPhase] = useState('idle')
   const [score, setScore] = useState(0)
@@ -265,10 +266,13 @@ export default function SnakeGame({ onBack }) {
         }
       }
 
-      // Respawn dead AI
+      // Respawn dead AI (length based on player ±15%)
+      const curPlayerLen = s.snakes.find(sn => sn.isPlayer)?.segs.length ?? 10
       for (const sn of s.snakes) {
         if (!sn.alive && !sn.isPlayer) {
-          Object.assign(sn, makeSnake(rand(120, W_W - 120), rand(120, W_H - 120), randInt(4, 14), sn.color, false))
+          const base = Math.max(5, curPlayerLen)
+          const newLen = randInt(Math.max(3, Math.floor(base * 0.85)), Math.ceil(base * 1.15))
+          Object.assign(sn, makeSnake(rand(120, W_W - 120), rand(120, W_H - 120), newLen, sn.color, false))
         }
       }
 
@@ -337,6 +341,10 @@ export default function SnakeGame({ onBack }) {
         ctx.shadowBlur = 0
       }
 
+      // Find longest snake for crown
+      const liveSns = s.snakes.filter(sn => sn.alive)
+      const longestSn = liveSns.length > 0 ? liveSns.reduce((a, b) => a.segs.length >= b.segs.length ? a : b) : null
+
       // Snakes
       for (const sn of s.snakes) {
         if (!sn.alive || sn.segs.length === 0) continue
@@ -379,12 +387,17 @@ export default function SnakeGame({ onBack }) {
           ctx.fillStyle = '#111'; ctx.fill()
         }
 
-        // Length label above head
+        // Length label + crown above head
         if (hx > -20 && hx < CW + 20 && hy > -20 && hy < CH + 20) {
+          if (sn === longestSn) {
+            ctx.font = '16px serif'
+            ctx.textAlign = 'center'
+            ctx.fillText('👑', hx, hy - hr - 16)
+          }
           ctx.fillStyle = sn.isPlayer ? '#FFD700' : 'rgba(255,255,255,0.75)'
           ctx.font = `bold ${sn.isPlayer ? 12 : 10}px monospace`
           ctx.textAlign = 'center'
-          ctx.fillText(sn.segs.length, hx, hy - hr - 4)
+          ctx.fillText(sn.segs.length, hx, hy - hr - (sn === longestSn ? 4 : 4))
         }
       }
 
@@ -436,44 +449,61 @@ export default function SnakeGame({ onBack }) {
 
   const clearPointer = useCallback(() => { pointerRef.current = null }, [])
 
-  // ── Joystick (touch) ──────────────────────────────────────────────────────
-  const onJoyStart = useCallback((e) => {
-    e.preventDefault()
-    const touch = e.targetTouches[0]
-    const rect = e.currentTarget.getBoundingClientRect()
-    joyRef.current = {
-      active: true,
-      cx: rect.left + rect.width / 2,
-      cy: rect.top + rect.height / 2,
-      dx: 0, dy: 0,
-    }
-  }, [])
+  // ── Dynamic joystick (touch events on wrap) ───────────────────────────────
+  useEffect(() => {
+    if (!IS_TOUCH || phase !== 'playing') return
+    const wrap = wrapRef.current
+    if (!wrap) return
 
-  const onJoyMove = useCallback((e) => {
-    e.preventDefault()
-    const joy = joyRef.current
-    if (!joy.active) return
-    const touch = e.targetTouches[0]
-    const rawDx = touch.clientX - joy.cx
-    const rawDy = touch.clientY - joy.cy
-    const maxR = 44
-    const dist = Math.sqrt(rawDx * rawDx + rawDy * rawDy)
-    joy.dx = dist > maxR ? rawDx / dist * maxR : rawDx
-    joy.dy = dist > maxR ? rawDy / dist * maxR : rawDy
-    if (joyKnobRef.current) {
-      joyKnobRef.current.style.transform = `translate(${joy.dx}px, ${joy.dy}px)`
+    function onTouchStart(e) {
+      if (e.target.closest('button')) return
+      e.preventDefault()
+      const touch = e.changedTouches[0]
+      const cx = touch.clientX, cy = touch.clientY
+      joyRef.current = { active: true, cx, cy, dx: 0, dy: 0 }
+      const container = joyContainerRef.current
+      if (container) {
+        container.style.left = `${cx - 65}px`
+        container.style.top = `${cy - 65}px`
+        container.style.display = 'flex'
+      }
     }
-  }, [])
 
-  const onJoyEnd = useCallback((e) => {
-    e.preventDefault()
-    joyRef.current.active = false
-    joyRef.current.dx = 0
-    joyRef.current.dy = 0
-    if (joyKnobRef.current) {
-      joyKnobRef.current.style.transform = 'translate(0px, 0px)'
+    function onTouchMove(e) {
+      e.preventDefault()
+      const joy = joyRef.current
+      if (!joy.active) return
+      const touch = e.changedTouches[0]
+      const rawDx = touch.clientX - joy.cx
+      const rawDy = touch.clientY - joy.cy
+      const maxR = 44
+      const dist = Math.sqrt(rawDx * rawDx + rawDy * rawDy)
+      joy.dx = dist > maxR ? rawDx / dist * maxR : rawDx
+      joy.dy = dist > maxR ? rawDy / dist * maxR : rawDy
+      if (joyKnobRef.current) {
+        joyKnobRef.current.style.transform = `translate(${joy.dx}px, ${joy.dy}px)`
+      }
     }
-  }, [])
+
+    function onTouchEnd() {
+      joyRef.current.active = false
+      joyRef.current.dx = 0
+      joyRef.current.dy = 0
+      if (joyKnobRef.current) joyKnobRef.current.style.transform = 'translate(0px, 0px)'
+      if (joyContainerRef.current) joyContainerRef.current.style.display = 'none'
+    }
+
+    wrap.addEventListener('touchstart', onTouchStart, { passive: false })
+    wrap.addEventListener('touchmove', onTouchMove, { passive: false })
+    wrap.addEventListener('touchend', onTouchEnd)
+    wrap.addEventListener('touchcancel', onTouchEnd)
+    return () => {
+      wrap.removeEventListener('touchstart', onTouchStart)
+      wrap.removeEventListener('touchmove', onTouchMove)
+      wrap.removeEventListener('touchend', onTouchEnd)
+      wrap.removeEventListener('touchcancel', onTouchEnd)
+    }
+  }, [phase])
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
@@ -494,21 +524,22 @@ export default function SnakeGame({ onBack }) {
         </div>
       )}
 
+      {/* Back button during gameplay */}
+      {phase === 'playing' && (
+        <button style={s.backInGame} onClick={() => setPhase('idle')}>← 나가기</button>
+      )}
+
       {/* Controls hint */}
       {phase === 'playing' && !IS_TOUCH && (
         <div style={s.hint}>← → 키 또는 마우스로 방향 조종</div>
       )}
 
-      {/* Mobile joystick */}
-      {phase === 'playing' && IS_TOUCH && (
-        <div
-          style={s.joyBase}
-          onTouchStart={onJoyStart}
-          onTouchMove={onJoyMove}
-          onTouchEnd={onJoyEnd}
-          onTouchCancel={onJoyEnd}
-        >
-          <div ref={joyKnobRef} style={s.joyKnob} />
+      {/* Dynamic joystick (shown/hidden via ref) */}
+      {IS_TOUCH && (
+        <div ref={joyContainerRef} style={s.joyContainer}>
+          <div style={s.joyBase}>
+            <div ref={joyKnobRef} style={s.joyKnob} />
+          </div>
         </div>
       )}
 
@@ -672,6 +703,27 @@ const s = {
     fontSize: 'clamp(15px, 3vw, 20px)',
     fontWeight: 'bold',
   },
+  backInGame: {
+    position: 'absolute',
+    top: 12,
+    right: 14,
+    background: 'rgba(0,0,0,0.55)',
+    border: '1px solid #444',
+    color: '#aaa',
+    fontSize: 'clamp(12px, 2.5vw, 14px)',
+    borderRadius: 20,
+    padding: '5px 14px',
+    cursor: 'pointer',
+  },
+  joyContainer: {
+    position: 'absolute',
+    display: 'none',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: 130,
+    height: 130,
+    pointerEvents: 'none',
+  },
   colorLabel: {
     color: '#aaa',
     fontSize: 'clamp(11px, 2vw, 13px)',
@@ -712,19 +764,14 @@ const s = {
     cursor: 'pointer',
   },
   joyBase: {
-    position: 'absolute',
-    bottom: 30,
-    left: 30,
     width: 130,
     height: 130,
     borderRadius: '50%',
     background: 'rgba(255,255,255,0.07)',
-    border: '2px solid rgba(255,255,255,0.18)',
+    border: '2px solid rgba(255,255,255,0.2)',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    touchAction: 'none',
-    userSelect: 'none',
   },
   joyKnob: {
     width: 54,
