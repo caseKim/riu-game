@@ -24,10 +24,7 @@ function dist2(a, b) { const dx = a.x - b.x, dy = a.y - b.y; return dx * dx + dy
 
 function makeSnake(x, y, len, color, isPlayer) {
   const angle = rand(0, Math.PI * 2)
-  const segs = []
-  for (let i = 0; i < len; i++) {
-    segs.push({ x: x - Math.cos(angle) * i * SEG_GAP, y: y - Math.sin(angle) * i * SEG_GAP })
-  }
+  const segs = Array.from({ length: len }, () => ({ x, y }))
   return { segs, targetLen: len, angle, color, isPlayer, alive: true, aiTimer: rand(0, 60), aiAngle: angle }
 }
 
@@ -297,17 +294,32 @@ export default function SnakeGame({ onBack }) {
             const seg = b.segs[k]
             const dx = headA.x - seg.x, dy = headA.y - seg.y
             if (dx * dx + dy * dy < (SEG_R * 1.5) * (SEG_R * 1.5)) {
-              if (lenA >= lenB) {
-                if (!b.alive) continue
-                b.alive = false
-                a.targetLen += Math.floor(lenB * 0.5)
-                if (a.isPlayer) s.score += Math.max(5, Math.floor(lenB / 2))
-                // Drop food where B dies
-                b.segs.filter((_, idx) => idx % 4 === 0).forEach(sg =>
-                  s.foods.push({ x: sg.x, y: sg.y, r: rand(4, 8), color: b.color })
-                )
+              if (k === 0) {
+                // Head-to-head: larger eats smaller
+                if (lenA >= lenB) {
+                  if (!b.alive) continue
+                  b.alive = false
+                  a.targetLen += Math.floor(lenB * 0.5)
+                  if (a.isPlayer) s.score += Math.max(5, Math.floor(lenB / 2))
+                  b.segs.filter((_, idx) => idx % 4 === 0).forEach(sg =>
+                    s.foods.push({ x: sg.x, y: sg.y, r: rand(4, 8), color: b.color })
+                  )
+                } else {
+                  a.alive = false
+                }
               } else {
-                a.alive = false
+                // Body hit: A shorter than B → A dies; A longer/equal → cut B's tail
+                if (lenA < lenB) {
+                  a.alive = false
+                } else {
+                  const cutSegs = b.segs.splice(k)
+                  b.targetLen = b.segs.length
+                  cutSegs.filter((_, idx) => idx % 3 === 0).forEach(sg =>
+                    s.foods.push({ x: sg.x, y: sg.y, r: rand(4, 7), color: b.color })
+                  )
+                  a.targetLen += Math.max(1, Math.floor(cutSegs.length * 0.4))
+                  if (a.isPlayer) s.score += Math.max(1, Math.floor(cutSegs.length / 4))
+                }
               }
               break
             }
@@ -653,8 +665,9 @@ export default function SnakeGame({ onBack }) {
           <div style={s.box}>
             <div style={s.title}>게임 오버</div>
             <div style={s.bigScore}>{score}점</div>
+            <div style={s.bestScore}>최고 {best}점</div>
             {score > 0 && score >= best && (
-              <div style={s.newBest}>최고 기록!</div>
+              <div style={s.newBest}>🎉 최고 기록!</div>
             )}
             <div>
               <div style={s.colorLabel}>난이도</div>
@@ -786,6 +799,12 @@ const s = {
     color: '#fff',
     fontSize: 'clamp(28px, 6vw, 40px)',
     fontWeight: 'bold',
+  },
+  bestScore: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 'clamp(13px, 2.5vw, 16px)',
+    marginTop: 2,
+    marginBottom: 4,
   },
   newBest: {
     color: '#FFD700',
