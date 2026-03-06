@@ -306,11 +306,17 @@ export default function SnakeGame({ onBack }) {
                   )
                 } else {
                   a.alive = false
+                  a.segs.filter((_, idx) => idx % 4 === 0).forEach(sg =>
+                    s.foods.push({ x: sg.x, y: sg.y, r: rand(4, 8), color: a.color })
+                  )
                 }
               } else {
                 // Body hit: A shorter than B → A dies; A longer/equal → cut B's tail
                 if (lenA < lenB) {
                   a.alive = false
+                  a.segs.filter((_, idx) => idx % 4 === 0).forEach(sg =>
+                    s.foods.push({ x: sg.x, y: sg.y, r: rand(4, 8), color: a.color })
+                  )
                 } else {
                   const cutSegs = b.segs.splice(k)
                   b.targetLen = b.segs.length
