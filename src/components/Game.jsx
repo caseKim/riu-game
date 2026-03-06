@@ -25,7 +25,7 @@ export default function Game({ character, difficulty, onBack }) {
   const canvasWrapRef = useRef(null)
   const stateRef = useRef(null)
   const gameOverAtRef = useRef(0)
-  if (!stateRef.current) stateRef.current = makeInitialState()
+  if (stateRef.current == null) stateRef.current = makeInitialState()
   const animRef = useRef(null)
   const [score, setScore] = useState(0)
   const [best, setBest] = useState(() => Number(localStorage.getItem(bestKey) || 0))
@@ -71,11 +71,11 @@ export default function Game({ character, difficulty, onBack }) {
     stateRef.current = makeInitialState()
     setScore(0)
     setPhase('playing')
-  }, [])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     const onKey = (e) => {
-      if (e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'Tab') {
+      if (e.code === 'Space' || e.code === 'ArrowUp') {
         e.preventDefault()
         if (phase === 'gameover') {
           if (Date.now() - gameOverAtRef.current < 800) return
@@ -255,7 +255,7 @@ export default function Game({ character, difficulty, onBack }) {
 
     animRef.current = requestAnimationFrame(loop)
     return () => cancelAnimationFrame(animRef.current)
-  }, [phase])
+  }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div style={styles.wrapper}>

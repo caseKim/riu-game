@@ -5,10 +5,8 @@ const W_W = 2400
 const W_H = 2400
 const SEG_R = 9
 const SEG_GAP = 13
-const SPEED = 2.5
 const MAX_TURN = 0.072
 const NUM_AI = 20
-const FOOD_COUNT = 400
 const INIT_LEN = 8
 
 // ── Snake colors ──────────────────────────────────────────────────────────────
@@ -99,10 +97,6 @@ export default function SnakeGame({ onBack }) {
   const [playerLen, setPlayerLen] = useState(INIT_LEN)
   const [playerColor, setPlayerColor] = useState(() => localStorage.getItem('snake_color') || '#FFD700')
 
-  useEffect(() => {
-    setBest(Number(localStorage.getItem(`snake_best_${difficulty.id}`) || 0))
-  }, [difficulty.id])
-
   // ── Init ──────────────────────────────────────────────────────────────────
   function initState(color, diff) {
     const snakes = []
@@ -130,6 +124,7 @@ export default function SnakeGame({ onBack }) {
   const pickDifficulty = useCallback((diff) => {
     setDifficulty(diff)
     localStorage.setItem('snake_diff', diff.id)
+    setBest(Number(localStorage.getItem(`snake_best_${diff.id}`) || 0))
   }, [])
 
   const pickColor = useCallback((color) => {
@@ -170,27 +165,30 @@ export default function SnakeGame({ onBack }) {
       const CW = canvas.width
       const CH = canvas.height
 
+      // Find player once per frame
+      const playerSnake = s.snakes.find(sn => sn.isPlayer)
+      const pSn = playerSnake?.alive ? playerSnake : null
+
       // ── Player steering ─────────────────────────────────────────────────
-      const player = s.snakes.find(sn => sn.isPlayer && sn.alive)
-      if (player) {
+      if (pSn) {
         const keys = keysRef.current
         const turnRate = MAX_TURN * 1.6
-        if (keys['ArrowLeft'] || keys['a'] || keys['A']) player.angle -= turnRate
-        if (keys['ArrowRight'] || keys['d'] || keys['D']) player.angle += turnRate
+        if (keys['ArrowLeft'] || keys['a'] || keys['A']) pSn.angle -= turnRate
+        if (keys['ArrowRight'] || keys['d'] || keys['D']) pSn.angle += turnRate
 
         // Joystick steering (mobile)
         const joy = joyRef.current
         if (joy.active && joy.dx * joy.dx + joy.dy * joy.dy > 8 * 8) {
           const target = Math.atan2(joy.dy, joy.dx)
-          let diff = target - player.angle
+          let diff = target - pSn.angle
           while (diff > Math.PI) diff -= Math.PI * 2
           while (diff < -Math.PI) diff += Math.PI * 2
-          player.angle += Math.max(-turnRate, Math.min(turnRate, diff))
+          pSn.angle += Math.max(-turnRate, Math.min(turnRate, diff))
         }
 
         // Mouse steering (desktop, only when joystick not active)
         if (!joy.active && pointerRef.current) {
-          const head = player.segs[0]
+          const head = pSn.segs[0]
           const camX = Math.max(0, Math.min(W_W - CW, head.x - CW / 2))
           const camY = Math.max(0, Math.min(W_H - CH, head.y - CH / 2))
           const wx = pointerRef.current.x + camX
@@ -198,10 +196,10 @@ export default function SnakeGame({ onBack }) {
           const dx = wx - head.x, dy = wy - head.y
           if (dx * dx + dy * dy > 15 * 15) {
             const target = Math.atan2(dy, dx)
-            let diff = target - player.angle
+            let diff = target - pSn.angle
             while (diff > Math.PI) diff -= Math.PI * 2
             while (diff < -Math.PI) diff += Math.PI * 2
-            player.angle += Math.max(-turnRate, Math.min(turnRate, diff))
+            pSn.angle += Math.max(-turnRate, Math.min(turnRate, diff))
           }
         }
       }
@@ -319,7 +317,7 @@ export default function SnakeGame({ onBack }) {
       }
 
       // Respawn dead AI (length based on player ±15%)
-      const curPlayerLen = s.snakes.find(sn => sn.isPlayer)?.segs.length ?? 10
+      const curPlayerLen = playerSnake?.segs.length ?? 10
       for (const sn of s.snakes) {
         if (!sn.alive && !sn.isPlayer) {
           const base = Math.max(5, curPlayerLen)
@@ -329,7 +327,6 @@ export default function SnakeGame({ onBack }) {
       }
 
       // Player death check
-      const playerSnake = s.snakes.find(sn => sn.isPlayer)
       if (playerSnake && !playerSnake.alive) {
         const finalScore = s.score
         const bestKey = `snake_best_${s.diff.id}`
@@ -345,14 +342,13 @@ export default function SnakeGame({ onBack }) {
       }
 
       // UI updates
-      if (s.frame % 8 === 0 && playerSnake?.alive) {
+      if (s.frame % 8 === 0 && pSn) {
         setScore(s.score)
         setAliveCount(s.snakes.filter(sn => sn.alive).length)
-        setPlayerLen(playerSnake.segs.length)
+        setPlayerLen(pSn.segs.length)
       }
 
       // ── Draw ─────────────────────────────────────────────────────────────
-      const pSn = s.snakes.find(sn => sn.isPlayer && sn.alive)
       let camX = 0, camY = 0
       if (pSn) {
         const ph = pSn.segs[0]
@@ -398,6 +394,7 @@ export default function SnakeGame({ onBack }) {
       // Find longest snake for crown
       const liveSns = s.snakes.filter(sn => sn.alive)
       const longestSn = liveSns.length > 0 ? liveSns.reduce((a, b) => a.segs.length >= b.segs.length ? a : b) : null
+      const playerLenDraw = pSn ? pSn.segs.length : 0
 
       // Snakes
       for (const sn of s.snakes) {
@@ -448,8 +445,7 @@ export default function SnakeGame({ onBack }) {
             ctx.textAlign = 'center'
             ctx.fillText('👑', hx, hy - hr - 16)
           }
-          const playerLen = pSn ? pSn.segs.length : 0
-          const isDanger = !sn.isPlayer && sn.segs.length > playerLen
+          const isDanger = !sn.isPlayer && sn.segs.length > playerLenDraw
           ctx.fillStyle = sn.isPlayer ? '#FFD700' : isDanger ? '#FF4444' : 'rgba(255,255,255,0.75)'
           ctx.font = `bold ${sn.isPlayer ? 12 : 10}px monospace`
           ctx.textAlign = 'center'
@@ -496,10 +492,9 @@ export default function SnakeGame({ onBack }) {
     const canvas = canvasRef.current
     if (!canvas) return
     const rect = canvas.getBoundingClientRect()
-    const src = e.touches ? e.touches[0] : e
     pointerRef.current = {
-      x: (src.clientX - rect.left) * (canvas.width / rect.width),
-      y: (src.clientY - rect.top) * (canvas.height / rect.height),
+      x: (e.clientX - rect.left) * (canvas.width / rect.width),
+      y: (e.clientY - rect.top) * (canvas.height / rect.height),
     }
   }, [])
 
