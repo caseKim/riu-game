@@ -55,12 +55,13 @@ export default function SnakeGame({ onBack }) {
   const [best, setBest] = useState(() => Number(localStorage.getItem('snake_best') || 0))
   const [aliveCount, setAliveCount] = useState(NUM_AI + 1)
   const [playerLen, setPlayerLen] = useState(INIT_LEN)
+  const [playerColor, setPlayerColor] = useState(() => localStorage.getItem('snake_color') || '#FFD700')
 
   // ── Init ──────────────────────────────────────────────────────────────────
-  function initState() {
+  function initState(color) {
     const snakes = []
-    const usedColors = new Set(['#FFD700'])
-    snakes.push(makeSnake(W_W / 2, W_H / 2, INIT_LEN, '#FFD700', true))
+    const usedColors = new Set([color])
+    snakes.push(makeSnake(W_W / 2, W_H / 2, INIT_LEN, color, true))
 
     const aiColors = COLORS.filter(c => !usedColors.has(c))
     for (let i = 0; i < NUM_AI; i++) {
@@ -73,11 +74,16 @@ export default function SnakeGame({ onBack }) {
   }
 
   const startGame = useCallback(() => {
-    stateRef.current = initState()
+    stateRef.current = initState(playerColor)
     setScore(0)
     setPlayerLen(INIT_LEN)
     setAliveCount(NUM_AI + 1)
     setPhase('playing')
+  }, [playerColor])
+
+  const pickColor = useCallback((color) => {
+    setPlayerColor(color)
+    localStorage.setItem('snake_color', color)
   }, [])
 
   // ── Keyboard ──────────────────────────────────────────────────────────────
@@ -514,11 +520,27 @@ export default function SnakeGame({ onBack }) {
             <div style={s.desc}>
               <p>더 작은 뱀을 먹어서 크게 자라요!</p>
               <p>나보다 큰 뱀은 조심하세요 위험해요!</p>
-              <p style={{ fontSize: 'clamp(11px,2vw,13px)', color: '#888', marginTop: 4 }}>
-                ← → 키 또는 터치로 방향 조종
-              </p>
             </div>
-            <button style={s.btnPrimary} onClick={startGame}>시작하기</button>
+            <div>
+              <div style={s.colorLabel}>내 뱀 색깔 고르기</div>
+              <div style={s.colorGrid}>
+                {['#FFD700', ...COLORS].map(c => (
+                  <button
+                    key={c}
+                    onClick={() => pickColor(c)}
+                    style={{
+                      ...s.colorSwatch,
+                      background: c,
+                      transform: playerColor === c ? 'scale(1.25)' : 'scale(1)',
+                      outline: playerColor === c ? `3px solid #fff` : '3px solid transparent',
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+            <button style={{ ...s.btnPrimary, background: playerColor }} onClick={startGame}>
+              시작하기
+            </button>
             <button style={s.btnBack} onClick={onBack}>← 돌아가기</button>
           </div>
         </div>
@@ -533,7 +555,24 @@ export default function SnakeGame({ onBack }) {
             {score > 0 && score >= best && (
               <div style={s.newBest}>최고 기록!</div>
             )}
-            <button style={s.btnPrimary} onClick={startGame}>다시 하기</button>
+            <div>
+              <div style={s.colorLabel}>색깔 바꾸기</div>
+              <div style={s.colorGrid}>
+                {['#FFD700', ...COLORS].map(c => (
+                  <button
+                    key={c}
+                    onClick={() => pickColor(c)}
+                    style={{
+                      ...s.colorSwatch,
+                      background: c,
+                      transform: playerColor === c ? 'scale(1.25)' : 'scale(1)',
+                      outline: playerColor === c ? `3px solid #fff` : '3px solid transparent',
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+            <button style={{ ...s.btnPrimary, background: playerColor }} onClick={startGame}>다시 하기</button>
             <button style={s.btnBack} onClick={onBack}>← 돌아가기</button>
           </div>
         </div>
@@ -633,8 +672,28 @@ const s = {
     fontSize: 'clamp(15px, 3vw, 20px)',
     fontWeight: 'bold',
   },
+  colorLabel: {
+    color: '#aaa',
+    fontSize: 'clamp(11px, 2vw, 13px)',
+    marginBottom: 10,
+  },
+  colorGrid: {
+    display: 'flex',
+    flexWrap: 'wrap',
+    gap: 8,
+    justifyContent: 'center',
+  },
+  colorSwatch: {
+    width: 28,
+    height: 28,
+    borderRadius: '50%',
+    border: 'none',
+    cursor: 'pointer',
+    padding: 0,
+    transition: 'transform 0.12s, outline 0.12s',
+    outlineOffset: 2,
+  },
   btnPrimary: {
-    background: '#FFD700',
     color: '#1a1a2e',
     border: 'none',
     borderRadius: 10,
