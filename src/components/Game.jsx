@@ -267,7 +267,7 @@ export default function Game({ character, difficulty, onBack }) {
         {character.emoji} {character.name} &nbsp;·&nbsp;
         <span style={{ ...styles.diffBadge, background: difficulty.color }}>{difficulty.emoji} {difficulty.label}</span>
       </p>
-      <div ref={canvasWrapRef} style={styles.gameArea} onClick={jump}>
+      <div ref={canvasWrapRef} style={styles.gameArea} onMouseDown={jump}>
         <div style={styles.canvasWrap}>
           <canvas
             ref={canvasRef}

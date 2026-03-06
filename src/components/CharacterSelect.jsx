@@ -33,7 +33,7 @@ function getBest(diffId) {
   return Number(localStorage.getItem(`best_${diffId}`) || 0)
 }
 
-export default function CharacterSelect({ onSelect }) {
+export default function CharacterSelect({ onSelect, onBack }) {
   const [tab, setTab] = useState('animals')
   const [character, setCharacter] = useState(CHARACTERS.animals[0])
   const [difficulty, setDifficulty] = useState(DIFFICULTIES[1])
@@ -45,7 +45,12 @@ export default function CharacterSelect({ onSelect }) {
 
   return (
     <div style={s.wrapper}>
-      <h1 style={s.title}>🎮 점프 게임!</h1>
+      {onBack && (
+        <div style={s.topBar}>
+          <button style={s.backBtn} onClick={onBack}>← 게임 선택</button>
+        </div>
+      )}
+      <h1 style={s.title}>🏃 점프 게임!</h1>
 
       {/* 캐릭터 선택 */}
       <p style={s.sectionLabel}>캐릭터를 골라봐요!</p>
@@ -259,6 +264,23 @@ const s = {
   previewEmoji: { fontSize: 'clamp(32px, 8vw, 48px)' },
   previewName: { fontSize: 'clamp(15px, 4vw, 20px)', fontWeight: 'bold', color: '#FFD700' },
   previewDiff: { fontSize: 'clamp(12px, 2.5vw, 14px)', color: '#aaa', marginTop: 2 },
+  topBar: {
+    width: '100%',
+    maxWidth: 520,
+    display: 'flex',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  backBtn: {
+    fontSize: 'clamp(12px, 2.5vw, 14px)',
+    fontWeight: 'bold',
+    padding: '6px 14px',
+    borderRadius: 20,
+    border: '2px solid #444',
+    background: 'transparent',
+    color: '#aaa',
+    cursor: 'pointer',
+  },
   startBtn: {
     padding: 'clamp(12px, 3vw, 16px) clamp(28px, 8vw, 48px)',
     fontSize: 'clamp(18px, 4.5vw, 24px)',
