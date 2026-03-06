@@ -15,16 +15,24 @@ No test framework is set up.
 
 ## Architecture
 
-React + Vite single-page game. No routing — screen transitions are handled by conditional rendering in `App.jsx` via a single `selection` state (`null` = character select, object = game).
+React + Vite single-page app with two games. No routing — screen transitions are handled by conditional rendering in `App.jsx` via `gameId` and `selection` state.
 
 ### Screen flow
 
 ```
 App
- ├── CharacterSelect  (selection === null)
- └── Game             (selection !== null)
-       props: { character, difficulty, onBack }
+ ├── GameSelect          (gameId === null)
+ ├── SnakeGame           (gameId === 'snake')
+ └── CharacterSelect     (gameId === 'jump', selection === null)
+       └── Game          (selection !== null)
+             props: { character, difficulty, onBack }
 ```
+
+### Adding a new game
+
+1. Add entry to `GAMES` array in `GameSelect.jsx` with `available: true`
+2. Create `src/components/YourGame.jsx`
+3. Handle `gameId === 'your-id'` in `App.jsx`
 
 ### State management
 
@@ -87,3 +95,53 @@ All styles are inline JS objects (no CSS modules or Tailwind). Both screens shar
 - Title: `color: #FFD700`, `textShadow` glow
 - All sizes use `clamp()` for mobile responsiveness
 - Canvas scales via CSS `width: 100%; height: auto` — internal resolution stays 1000×420
+
+---
+
+## SnakeGame.jsx
+
+### Overview
+
+Full-screen canvas snake game. World is 2400×2400; viewport follows the player. 20 AI snakes + 1 player. Eat smaller snakes to grow; larger snakes kill you.
+
+### Key constants
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `W_W / W_H` | 2400 / 2400 | World dimensions |
+| `SEG_R` | 9 | Segment radius (px) |
+| `SEG_GAP` | 13 | Center-to-center segment spacing |
+| `MAX_TURN` | 0.072 | Max radians/frame steering |
+| `NUM_AI` | 20 | Number of AI snakes |
+| `INIT_LEN` | 8 | Starting snake length |
+| `DIFFICULTIES` | array | Per-difficulty speed/food/AI config |
+
+### State pattern
+
+Same `stateRef` pattern as Game.jsx — all mutable game state in a plain object, `useState` only for `score`, `best`, `phase`, `aliveCount`, `playerLen`, `playerColor`, `difficulty`.
+
+Key refs: `canvasRef`, `wrapRef`, `stateRef`, `animRef`, `keysRef`, `pointerRef`, `joyRef`, `joyKnobRef`, `joyContainerRef`
+
+### Snake object shape
+
+`{ segs: [{x,y}...], targetLen, angle, color, isPlayer, alive, aiTimer, aiAngle }`
+
+### Controls
+
+- **Desktop**: ← → arrow keys / A D, mouse direction following
+- **Mobile**: dynamic virtual joystick (appears at touch point, disappears on lift)
+- Touch events are on `wrapRef` via native `addEventListener({ passive: false })` to prevent scroll
+
+### AI behavior
+
+Every `aiTimer` frames: scan nearby snakes, chase smaller ones within `aiChaseRange`, flee from larger ones within `aiFleeRange`, wander otherwise. Wall avoidance near borders. Respawn length = player length ±15%.
+
+### Difficulty settings (`DIFFICULTIES` array)
+
+Each entry: `{ id, label, emoji, color, speed, foodCount, aiChaseRange, aiFleeRange, aiTimerMin, aiTimerMax }`
+Best scores: `localStorage` keys `snake_best_easy`, `snake_best_normal`, `snake_best_hard`
+
+### Player preferences
+
+- Color: `localStorage` key `snake_color`
+- Difficulty: `localStorage` key `snake_diff`
