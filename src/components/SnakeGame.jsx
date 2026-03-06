@@ -37,6 +37,8 @@ function makeFood() {
   return { x: rand(40, W_W - 40), y: rand(40, W_H - 40), r: rand(4, 7), color: `hsl(${rand(0, 360)},80%,65%)` }
 }
 
+const IS_TOUCH = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
+
 // ── Component ─────────────────────────────────────────────────────────────────
 export default function SnakeGame({ onBack }) {
   const canvasRef = useRef(null)
@@ -45,6 +47,8 @@ export default function SnakeGame({ onBack }) {
   const animRef = useRef(null)
   const keysRef = useRef({})
   const pointerRef = useRef(null) // canvas-space {x, y}
+  const joyRef = useRef({ active: false, cx: 0, cy: 0, dx: 0, dy: 0 })
+  const joyKnobRef = useRef(null)
 
   const [phase, setPhase] = useState('idle')
   const [score, setScore] = useState(0)
@@ -117,8 +121,18 @@ export default function SnakeGame({ onBack }) {
         if (keys['ArrowLeft'] || keys['a'] || keys['A']) player.angle -= turnRate
         if (keys['ArrowRight'] || keys['d'] || keys['D']) player.angle += turnRate
 
-        // Mouse / touch steering
-        if (pointerRef.current) {
+        // Joystick steering (mobile)
+        const joy = joyRef.current
+        if (joy.active && joy.dx * joy.dx + joy.dy * joy.dy > 8 * 8) {
+          const target = Math.atan2(joy.dy, joy.dx)
+          let diff = target - player.angle
+          while (diff > Math.PI) diff -= Math.PI * 2
+          while (diff < -Math.PI) diff += Math.PI * 2
+          player.angle += Math.max(-turnRate, Math.min(turnRate, diff))
+        }
+
+        // Mouse steering (desktop, only when joystick not active)
+        if (!joy.active && pointerRef.current) {
           const head = player.segs[0]
           const camX = Math.max(0, Math.min(W_W - CW, head.x - CW / 2))
           const camY = Math.max(0, Math.min(W_H - CH, head.y - CH / 2))
@@ -416,6 +430,45 @@ export default function SnakeGame({ onBack }) {
 
   const clearPointer = useCallback(() => { pointerRef.current = null }, [])
 
+  // ── Joystick (touch) ──────────────────────────────────────────────────────
+  const onJoyStart = useCallback((e) => {
+    e.preventDefault()
+    const touch = e.targetTouches[0]
+    const rect = e.currentTarget.getBoundingClientRect()
+    joyRef.current = {
+      active: true,
+      cx: rect.left + rect.width / 2,
+      cy: rect.top + rect.height / 2,
+      dx: 0, dy: 0,
+    }
+  }, [])
+
+  const onJoyMove = useCallback((e) => {
+    e.preventDefault()
+    const joy = joyRef.current
+    if (!joy.active) return
+    const touch = e.targetTouches[0]
+    const rawDx = touch.clientX - joy.cx
+    const rawDy = touch.clientY - joy.cy
+    const maxR = 44
+    const dist = Math.sqrt(rawDx * rawDx + rawDy * rawDy)
+    joy.dx = dist > maxR ? rawDx / dist * maxR : rawDx
+    joy.dy = dist > maxR ? rawDy / dist * maxR : rawDy
+    if (joyKnobRef.current) {
+      joyKnobRef.current.style.transform = `translate(${joy.dx}px, ${joy.dy}px)`
+    }
+  }, [])
+
+  const onJoyEnd = useCallback((e) => {
+    e.preventDefault()
+    joyRef.current.active = false
+    joyRef.current.dx = 0
+    joyRef.current.dy = 0
+    if (joyKnobRef.current) {
+      joyKnobRef.current.style.transform = 'translate(0px, 0px)'
+    }
+  }, [])
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div ref={wrapRef} style={s.wrap}>
@@ -423,10 +476,7 @@ export default function SnakeGame({ onBack }) {
         ref={canvasRef}
         style={s.canvas}
         onMouseMove={phase === 'playing' ? getCanvasPos : undefined}
-        onTouchStart={phase === 'playing' ? (e) => { e.preventDefault(); getCanvasPos(e) } : undefined}
-        onTouchMove={phase === 'playing' ? (e) => { e.preventDefault(); getCanvasPos(e) } : undefined}
         onMouseLeave={clearPointer}
-        onTouchEnd={clearPointer}
       />
 
       {/* HUD */}
@@ -439,8 +489,21 @@ export default function SnakeGame({ onBack }) {
       )}
 
       {/* Controls hint */}
-      {phase === 'playing' && (
-        <div style={s.hint}>← → 키 또는 터치로 방향 조종</div>
+      {phase === 'playing' && !IS_TOUCH && (
+        <div style={s.hint}>← → 키 또는 마우스로 방향 조종</div>
+      )}
+
+      {/* Mobile joystick */}
+      {phase === 'playing' && IS_TOUCH && (
+        <div
+          style={s.joyBase}
+          onTouchStart={onJoyStart}
+          onTouchMove={onJoyMove}
+          onTouchEnd={onJoyEnd}
+          onTouchCancel={onJoyEnd}
+        >
+          <div ref={joyKnobRef} style={s.joyKnob} />
+        </div>
       )}
 
       {/* Start overlay */}
@@ -487,6 +550,7 @@ const s = {
     overflow: 'hidden',
     background: '#0d1117',
     fontFamily: '"Segoe UI", sans-serif',
+    touchAction: 'none',
   },
   canvas: {
     display: 'block',
@@ -587,5 +651,29 @@ const s = {
     padding: '8px 20px',
     fontSize: 'clamp(13px, 2.5vw, 15px)',
     cursor: 'pointer',
+  },
+  joyBase: {
+    position: 'absolute',
+    bottom: 30,
+    left: 30,
+    width: 130,
+    height: 130,
+    borderRadius: '50%',
+    background: 'rgba(255,255,255,0.07)',
+    border: '2px solid rgba(255,255,255,0.18)',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    touchAction: 'none',
+    userSelect: 'none',
+  },
+  joyKnob: {
+    width: 54,
+    height: 54,
+    borderRadius: '50%',
+    background: 'rgba(255,255,255,0.38)',
+    border: '2px solid rgba(255,255,255,0.55)',
+    pointerEvents: 'none',
+    willChange: 'transform',
   },
 }
