@@ -11,6 +11,13 @@ const FRUITS = ['🍎', '🍊', '🍋', '🍇', '🍓', '🍒']
 // 먹을 수 있는 높이 (너무 어렵지 않게 — 지면~낮은 점프 범위)
 const FRUIT_HEIGHTS = [GROUND_Y - 45, GROUND_Y - 80, GROUND_Y - 120]
 
+const ITEMS = [
+  { type: 'invincible', emoji: '⭐', label: '무적!',   color: '#FFD700', duration: 300 },
+  { type: 'slow',       emoji: '🐌', label: '슬로우!', color: '#88DD44', duration: 250 },
+  { type: 'double',     emoji: '💎', label: '2배!',    color: '#44AAFF', duration: 360 },
+  { type: 'magnet',     emoji: '🧲', label: '자석!',   color: '#FF6644', duration: 300 },
+]
+
 const DIFF_SETTINGS = {
   easy:   { baseSpeed: 4, intervalMax: 130, intervalMin: 60, doubleScore: 9999, doubleChance: 0,    maxSpeed: 9  },
   normal: { baseSpeed: 6, intervalMax: 100, intervalMin: 40, doubleScore: 30,   doubleChance: 0.30, maxSpeed: 14 },
@@ -53,6 +60,11 @@ export default function Game({ character, difficulty, onBack }) {
       score: 0,
       frame: 0,
       speed: diff.baseSpeed,
+      items: [],
+      itemTimer: 0,
+      nextItemInterval: 450 + Math.floor(Math.random() * 250),
+      itemPopups: [],
+      active: { invincible: 0, slow: 0, double: 0, magnet: 0 },
     }
   }
 
@@ -148,10 +160,11 @@ export default function Game({ character, difficulty, onBack }) {
 
         // 속도 증가
         s.speed = Math.min(diff.maxSpeed, diff.baseSpeed + Math.floor(s.score / 10) * 0.6)
+        const curSpd = s.active.slow > 0 ? s.speed * 0.5 : s.speed
 
         // 장애물 이동
         s.obstacles = s.obstacles.filter((o) => {
-          o.x -= s.speed
+          o.x -= curSpd
           o.frame++
           return o.x + o.w > -30
         })
@@ -166,49 +179,93 @@ export default function Game({ character, difficulty, onBack }) {
           s.nextFruitInterval = 200 + Math.floor(Math.random() * 100)
         }
 
+        // 아이템 스폰
+        s.itemTimer++
+        if (s.itemTimer >= s.nextItemInterval) {
+          const item = ITEMS[Math.floor(Math.random() * ITEMS.length)]
+          const y = FRUIT_HEIGHTS[Math.floor(Math.random() * FRUIT_HEIGHTS.length)]
+          s.items.push({ type: item.type, x: W + 10, y, w: 40, h: 40, frame: 0 })
+          s.itemTimer = 0
+          s.nextItemInterval = 450 + Math.floor(Math.random() * 250)
+        }
+
         // 과일 이동 및 수집
         const p = s.player
         s.fruits = s.fruits.filter((f) => {
-          f.x -= s.speed
+          f.x -= curSpd
           f.frame++
+          // 자석 효과
+          if (s.active.magnet > 0) {
+            const dx = (p.x + PLAYER_SIZE / 2) - (f.x + f.w / 2)
+            const dy = (p.y + PLAYER_SIZE / 2) - (f.y + f.h / 2)
+            const dist = Math.sqrt(dx * dx + dy * dy)
+            if (dist < 320 && dist > 1) { f.x += dx / dist * 6; f.y += dy / dist * 6 }
+          }
           const collected =
             p.x + 10 < f.x + f.w &&
             p.x + PLAYER_SIZE - 10 > f.x &&
             p.y + 10 < f.y + f.h &&
             p.y + PLAYER_SIZE - 6 > f.y
           if (collected) {
-            s.score += 10
-            s.fruitPopups.push({ x: f.x + f.w / 2, y: f.y, life: 40 })
+            const pts = s.active.double > 0 ? 20 : 10
+            s.score += pts
+            s.fruitPopups.push({ x: f.x + f.w / 2, y: f.y, life: 40, pts })
             return false
           }
           return f.x + f.w > -10
         })
 
-        // +3 팝업 업데이트
+        // 아이템 이동 및 수집
+        s.items = s.items.filter(it => {
+          it.x -= curSpd
+          it.frame++
+          const collected =
+            p.x + 10 < it.x + it.w &&
+            p.x + PLAYER_SIZE - 10 > it.x &&
+            p.y + 10 < it.y + it.h &&
+            p.y + PLAYER_SIZE - 6 > it.y
+          if (collected) {
+            const cfg = ITEMS.find(i => i.type === it.type)
+            s.active[it.type] = cfg.duration
+            s.itemPopups.push({ label: cfg.label, color: cfg.color, x: it.x + it.w / 2, y: it.y, life: 55 })
+            return false
+          }
+          return it.x + it.w > -10
+        })
+
+        // 활성 아이템 타이머 감소
+        for (const key of Object.keys(s.active)) {
+          if (s.active[key] > 0) s.active[key]--
+        }
+
+        // 팝업 업데이트
         s.fruitPopups = s.fruitPopups.filter(fp => { fp.y -= 1.2; fp.life--; return fp.life > 0 })
+        s.itemPopups = s.itemPopups.filter(ip => { ip.y -= 1.5; ip.life--; return ip.life > 0 })
 
         // 점수
         s.score += 0.05
         setScore(Math.floor(s.score))
 
-        // 충돌 감지
-        for (const o of s.obstacles) {
-          if (
-            p.x + 10 < o.x + o.w - 4 &&
-            p.x + PLAYER_SIZE - 10 > o.x + 4 &&
-            p.y + 10 < o.y + o.h &&
-            p.y + PLAYER_SIZE - 6 > o.y
-          ) {
-            const finalScore = Math.floor(s.score)
-            setBest(prev => {
-              if (finalScore > prev) {
-                localStorage.setItem(bestKey, finalScore)
-                return finalScore
-              }
-              return prev
-            })
-            gameOverAtRef.current = Date.now()
-            setPhase('gameover')
+        // 충돌 감지 (무적 시 스킵)
+        if (s.active.invincible === 0) {
+          for (const o of s.obstacles) {
+            if (
+              p.x + 10 < o.x + o.w - 4 &&
+              p.x + PLAYER_SIZE - 10 > o.x + 4 &&
+              p.y + 10 < o.y + o.h &&
+              p.y + PLAYER_SIZE - 6 > o.y
+            ) {
+              const finalScore = Math.floor(s.score)
+              setBest(prev => {
+                if (finalScore > prev) {
+                  localStorage.setItem(bestKey, finalScore)
+                  return finalScore
+                }
+                return prev
+              })
+              gameOverAtRef.current = Date.now()
+              setPhase('gameover')
+            }
           }
         }
       }
@@ -223,25 +280,85 @@ export default function Game({ character, difficulty, onBack }) {
       // 과일 그리기
       for (const f of s.fruits) {
         const bob = Math.sin(f.frame * 0.12) * 4
-        ctx.font = '34px serif'
-        ctx.fillText(f.emoji, f.x, f.y + bob + f.h)
+        // 자석 활성화 시 과일 주변 글로우
+        if (s.active.magnet > 0) {
+          ctx.save()
+          ctx.shadowColor = '#FF6644'; ctx.shadowBlur = 10
+          ctx.font = '34px serif'
+          ctx.fillText(f.emoji, f.x, f.y + bob + f.h)
+          ctx.restore()
+        } else {
+          ctx.font = '34px serif'
+          ctx.fillText(f.emoji, f.x, f.y + bob + f.h)
+        }
       }
 
-      // +3 팝업 그리기
+      // 아이템 그리기
+      for (const it of s.items) {
+        const cfg = ITEMS.find(i => i.type === it.type)
+        const bob = Math.sin(it.frame * 0.1) * 5
+        ctx.save()
+        ctx.shadowColor = cfg.color; ctx.shadowBlur = 16
+        ctx.font = '32px serif'
+        ctx.fillText(cfg.emoji, it.x, it.y + bob + it.h)
+        ctx.restore()
+      }
+
+      // 과일/아이템 팝업 그리기
       for (const fp of s.fruitPopups) {
         const alpha = fp.life / 40
         ctx.globalAlpha = alpha
         ctx.font = 'bold 22px sans-serif'
-        ctx.fillStyle = '#FFD700'
-        ctx.strokeStyle = 'rgba(0,0,0,0.5)'
-        ctx.lineWidth = 3
-        ctx.strokeText('+10', fp.x - 18, fp.y)
-        ctx.fillText('+10', fp.x - 18, fp.y)
+        ctx.fillStyle = (fp.pts ?? 10) > 10 ? '#44AAFF' : '#FFD700'
+        ctx.strokeStyle = 'rgba(0,0,0,0.5)'; ctx.lineWidth = 3
+        const txt = `+${fp.pts ?? 10}`
+        ctx.strokeText(txt, fp.x - 14, fp.y)
+        ctx.fillText(txt, fp.x - 14, fp.y)
         ctx.globalAlpha = 1
+      }
+      for (const ip of s.itemPopups) {
+        const alpha = ip.life / 55
+        ctx.globalAlpha = alpha
+        ctx.font = 'bold 20px sans-serif'
+        ctx.fillStyle = ip.color
+        ctx.strokeStyle = 'rgba(0,0,0,0.6)'; ctx.lineWidth = 3
+        ctx.strokeText(ip.label, ip.x - 20, ip.y)
+        ctx.fillText(ip.label, ip.x - 20, ip.y)
+        ctx.globalAlpha = 1
+      }
+
+      // 활성 아이템 HUD (우상단)
+      let hudY = 14
+      for (const item of ITEMS) {
+        const rem = s.active[item.type]
+        if (rem <= 0) continue
+        const ratio = rem / item.duration
+        ctx.save()
+        ctx.shadowColor = item.color; ctx.shadowBlur = 8
+        ctx.font = '22px serif'
+        ctx.fillText(item.emoji, W - 92, hudY + 20)
+        ctx.restore()
+        ctx.fillStyle = 'rgba(0,0,0,0.45)'
+        ctx.beginPath(); ctx.roundRect(W - 68, hudY + 6, 58, 10, 5); ctx.fill()
+        ctx.fillStyle = item.color
+        ctx.beginPath(); ctx.roundRect(W - 68, hudY + 6, 58 * ratio, 10, 5); ctx.fill()
+        hudY += 30
       }
 
       // 플레이어
       const player = s.player
+      // 무적 이펙트
+      if (s.active.invincible > 0) {
+        const blink = Math.floor(s.frame / 5) % 2 === 0
+        ctx.save()
+        ctx.globalAlpha = blink ? 0.7 : 0.2
+        ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 3
+        ctx.shadowColor = '#FFD700'; ctx.shadowBlur = 12
+        ctx.beginPath()
+        ctx.arc(player.x + PLAYER_SIZE / 2, player.y + PLAYER_SIZE / 2, PLAYER_SIZE / 1.5, 0, Math.PI * 2)
+        ctx.stroke()
+        ctx.restore()
+      }
       if (!player.onGround && player.jumpCount === 2) {
         ctx.font = '18px serif'
         ctx.fillText('✨', player.x + PLAYER_SIZE, player.y + 8)
