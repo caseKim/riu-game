@@ -1,7 +1,25 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm install)"
+      "Bash(npm install)",
+      "Bash(git init && git status)",
+      "Bash(git add src/App.jsx src/index.css src/components/ CLAUDE.md 우리가-만든-게임.md)",
+      "Bash(ls /Users/ace/Dev/riu-game/*.md)",
+      "Bash(git add src/App.jsx src/index.css src/components/ CLAUDE.md && git status)",
+      "Bash(git commit -m \"$\\(cat <<'EOF'\n아이와 함께 만든 점프 게임 완성\n\n- 캐릭터 선택 \\(동물 8종 + 영웅 8종\\)\n- 난이도 선택 \\(쉬움 / 보통 / 어려움\\), 난이도별 최고 점수 저장\n- 2단 점프, 장애물 5종 \\(바위, 선인장, 새, 크리스탈 가시, 불꽃\\)\n- 점수에 따라 배경 변화 \\(낮 → 노을 → 밤\\)\n- 스페이스바로 점프 및 재시작\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(git push origin main)",
+      "Bash(npm run build 2>&1 | tail -20)",
+      "Bash(npm run lint 2>&1 && npm run build 2>&1 | tail -10)",
+      "Bash(npm run lint 2>&1)",
+      "Bash(git mv src/components/Game.jsx src/components/JumpGame.jsx)",
+      "Bash(npm run lint 2>&1 && npm run build 2>&1 | tail -15)",
+      "Bash(git mv src/components/CharacterSelect.jsx src/components/JumpSelect.jsx)",
+      "Bash(git mv src/components/JumpSelect.jsx src/components/JumpCharacterSelect.jsx)",
+      "Bash(git add src/components/JumpGame.jsx src/components/JumpCharacterSelect.jsx src/components/SnakeGame.jsx src/App.jsx CLAUDE.md && git status)",
+      "Bash(git commit -m \"$\\(cat <<'EOF'\nUX 통일 & 파일명 컨벤션 정리\n\n파일명:\n- Game.jsx → JumpGame.jsx\n- CharacterSelect.jsx → JumpCharacterSelect.jsx\n\n버튼 텍스트 통일:\n- 점프 게임 화면 내: '← 돌아가기' → '← 나가기'\n- 뱀 게임 오버레이: '← 돌아가기' → '← 게임 선택'\n\n게임 오버 화면 통일 \\(두 게임 장점 합산\\):\n- 이모지\\(🏆/😵\\) + 금색 '신기록!'/'게임 오버!' 타이틀\n- bigScore 큰 숫자 + bestScore 작은 텍스트 + '🎉 최고 기록!' 배지\n- 점프: 세로 버튼 배열, overlayBox 카드 구조\n- 뱀: 기존 diff/color picker 유지, 구조 통일\n\n배경색/버튼 스타일 통일\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(npm run lint 2>&1 && npm run build 2>&1 | tail -6)",
+      "Bash(npm run lint 2>&1 && npm run build 2>&1 | tail -5)",
+      "Bash(npm run lint 2>&1 && npm run build 2>&1 | tail -8)"
     ]
   }
 }

@@ -12,10 +12,10 @@ const FRUITS = ['🍎', '🍊', '🍋', '🍇', '🍓', '🍒']
 const FRUIT_HEIGHTS = [GROUND_Y - 45, GROUND_Y - 80, GROUND_Y - 120]
 
 const ITEMS = [
-  { type: 'invincible', emoji: '⭐', label: '무적!',   color: '#FFD700', duration: 300 },
-  { type: 'slow',       emoji: '🐌', label: '슬로우!', color: '#88DD44', duration: 250 },
-  { type: 'double',     emoji: '💎', label: '2배!',    color: '#44AAFF', duration: 360 },
-  { type: 'magnet',     emoji: '🧲', label: '자석!',   color: '#FF6644', duration: 300 },
+  { type: 'invincible', emoji: '⭐', label: '무적!',      color: '#FFD700', duration: 420 },
+  { type: 'triple',     emoji: '🦅', label: '3단 점프!',  color: '#44DDFF', duration: 400 },
+  { type: 'double',     emoji: '💎', label: '2배!',       color: '#44AAFF', duration: 480 },
+  { type: 'magnet',     emoji: '🧲', label: '자석!',      color: '#FF6644', duration: 420 },
 ]
 
 const DIFF_SETTINGS = {
@@ -64,7 +64,7 @@ export default function Game({ character, difficulty, onBack }) {
       itemTimer: 0,
       nextItemInterval: 450 + Math.floor(Math.random() * 250),
       itemPopups: [],
-      active: { invincible: 0, slow: 0, double: 0, magnet: 0 },
+      active: { invincible: 0, triple: 0, double: 0, magnet: 0 },
     }
   }
 
@@ -72,7 +72,8 @@ export default function Game({ character, difficulty, onBack }) {
     if (phase === 'gameover') return
     if (phase === 'idle') setPhase('playing')
     const p = stateRef.current.player
-    if (p.jumpCount < 2) {
+    const maxJumps = stateRef.current.active.triple > 0 ? 3 : 2
+    if (p.jumpCount < maxJumps) {
       p.vy = p.jumpCount === 0 ? JUMP_FORCE : JUMP_FORCE * 0.85
       p.onGround = false
       p.jumpCount++
@@ -160,7 +161,7 @@ export default function Game({ character, difficulty, onBack }) {
 
         // 속도 증가
         s.speed = Math.min(diff.maxSpeed, diff.baseSpeed + Math.floor(s.score / 10) * 0.6)
-        const curSpd = s.active.slow > 0 ? s.speed * 0.5 : s.speed
+        const curSpd = s.speed
 
         // 장애물 이동
         s.obstacles = s.obstacles.filter((o) => {
@@ -363,6 +364,14 @@ export default function Game({ character, difficulty, onBack }) {
         ctx.font = '18px serif'
         ctx.fillText('✨', player.x + PLAYER_SIZE, player.y + 8)
         ctx.fillText('✨', player.x - 8, player.y + 22)
+      }
+      if (!player.onGround && player.jumpCount === 3) {
+        ctx.save()
+        ctx.shadowColor = '#44DDFF'; ctx.shadowBlur = 10
+        ctx.font = '20px serif'
+        ctx.fillText('🌀', player.x + PLAYER_SIZE, player.y + 6)
+        ctx.fillText('🌀', player.x - 10, player.y + 20)
+        ctx.restore()
       }
       ctx.font = `${PLAYER_SIZE}px serif`
       ctx.fillText(character.emoji, player.x, player.y + PLAYER_SIZE)

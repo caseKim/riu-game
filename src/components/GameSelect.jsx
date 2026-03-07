@@ -14,11 +14,11 @@ const GAMES = [
     available: true,
   },
   {
-    id: 'quiz',
-    emoji: '❓',
-    name: '퀴즈 게임',
-    desc: '문제를 풀어봐요!',
-    available: false,
+    id: 'space',
+    emoji: '🚀',
+    name: '우주 슈팅',
+    desc: '외계인을 물리쳐요!',
+    available: true,
   },
   {
     id: 'drawing',
