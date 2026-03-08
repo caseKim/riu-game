@@ -5,11 +5,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Working Rules
 
 - Never ask the user to paste full files
-- Do not rewrite entire files — return minimal patches only
+- Search before reading files (Grep/Glob)
+- Read only the necessary sections
+- Avoid reading entire files unless necessary
+
+- Do not rewrite entire files
+- Return minimal patches or diffs
 - Do not reformat unrelated code
-- Avoid long explanations; code first, explanation optional
-- Before reading files, search with Grep/Glob first
-- Read only the necessary file sections, not entire files
+- Preserve existing code style
+
+- Prefer working from git diff
+- Focus only on relevant code
+
+- Avoid long explanations
+- Code first, explanation optional
 
 ## Commands
 
