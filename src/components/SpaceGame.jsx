@@ -36,7 +36,16 @@ const ITEM_TYPES = [
   { id: 'bomb',   emoji: '💣', label: '폭탄',   color: '#ff8800', duration: 0 },
 ]
 
-const WAVE_SUBTITLES = ['', '다이버 등장!', '포메이션 강화!', '5방향 보스!', '조준 사격!', '사인파 돌격!', '최후의 결전!']
+const WAVE_SUBTITLES = ['', 'V자 편대! 다이버 등장!', '측면 기습!', '마름모 진형 + 조준 사격!', '지그재그 + 사인파!', '군집 공격!', '최후의 결전!']
+
+// 보스 타입: 웨이브별로 다른 보스
+const BOSS_TYPES = [
+  { id: 'standard', color: '#bb44ff', bg: '#330055', label: 'BOSS' },
+  { id: 'blitz',    color: '#ff4444', bg: '#550000', label: '🔥 BLITZ' },
+  { id: 'spawner',  color: '#44ff88', bg: '#003311', label: '🧬 SPAWNER' },
+  { id: 'dasher',   color: '#44aaff', bg: '#001133', label: '⚡ DASHER' },
+  { id: 'chaos',    color: '#ffaa00', bg: '#331100', label: '👑 CHAOS' },
+]
 
 const DIFFICULTIES = [
   { id: 'easy',   label: '쉬움',   emoji: '🟢', color: '#4CAF50', alienSpd: 0.7,  fireMin: 100, bossHp: 12 },
@@ -45,50 +54,125 @@ const DIFFICULTIES = [
 ]
 
 // ── 헬퍼 함수 ───────────────────────────────────────────────────────
+// 웨이브별 포메이션: grid → V자 → 측면분산 → 마름모 → 지그재그 → 군집
+const FORMATIONS = ['grid', 'V', 'flanks', 'diamond', 'stagger', 'swarm']
+
 function getWaveCfg(wave) {
   return {
     cols: Math.min(8 + Math.floor((wave - 1) / 2), 11),
     rows: Math.min(3 + Math.floor((wave - 1) / 2), 5),
+    formation: FORMATIONS[Math.min(wave - 1, FORMATIONS.length - 1)],
     hasDivers:   wave >= 2,
     hasUfo:      wave >= 2,
-    hasAimed:    wave >= 4,   // 조준 사격 (플레이어 방향으로 쏨)
-    hasSineMove: wave >= 5,   // 사인파 상하 진동
+    hasAimed:    wave >= 4,
+    hasSineMove: wave >= 5,
   }
 }
 
 function makeAliens(wave = 1) {
-  const { cols, rows } = getWaveCfg(wave)
-  const startX = W / 2 - (cols - 1) * ALIEN_GAP_X / 2
-  const aliens = []
-  for (let row = 0; row < rows; row++) {
-    const cfgIdx = Math.min(row, ALIEN_CFG.length - 1)
-    for (let col = 0; col < cols; col++) {
-      aliens.push({
-        x: startX + col * ALIEN_GAP_X,
-        y: ALIEN_START_Y + row * ALIEN_GAP_Y,
-        cfgIdx, col,
-        hp: ALIEN_CFG[cfgIdx].hp,
-        frame: Math.floor(Math.random() * 40),
-        isDiver: false, dvx: 0, dvy: 0,
-      })
+  const { cols, rows, formation } = getWaveCfg(wave)
+  const positions = []  // [x, y, rowIdx]
+
+  if (formation === 'grid') {
+    const sx = W / 2 - (cols - 1) * ALIEN_GAP_X / 2
+    for (let r = 0; r < rows; r++)
+      for (let c = 0; c < cols; c++)
+        positions.push([sx + c * ALIEN_GAP_X, ALIEN_START_Y + r * ALIEN_GAP_Y, r])
+
+  } else if (formation === 'V') {
+    // 아래가 넓고 위가 좁은 역삼각형
+    for (let r = 0; r < rows; r++) {
+      const cnt = Math.max(3, cols - (rows - 1 - r) * 2)
+      const sx = W / 2 - (cnt - 1) * ALIEN_GAP_X / 2
+      for (let c = 0; c < cnt; c++)
+        positions.push([sx + c * ALIEN_GAP_X, ALIEN_START_Y + r * ALIEN_GAP_Y, r])
     }
+
+  } else if (formation === 'flanks') {
+    // 좌우로 분산된 두 그룹
+    const half = Math.ceil(cols / 2)
+    for (let r = 0; r < rows; r++) {
+      for (let c = 0; c < half; c++)
+        positions.push([70 + c * ALIEN_GAP_X, ALIEN_START_Y + r * ALIEN_GAP_Y, r])
+      for (let c = 0; c < half; c++)
+        positions.push([W - 70 - (half - 1 - c) * ALIEN_GAP_X, ALIEN_START_Y + r * ALIEN_GAP_Y, r])
+    }
+
+  } else if (formation === 'diamond') {
+    // 마름모 형태
+    const mid = Math.floor(rows / 2)
+    for (let r = 0; r < rows; r++) {
+      const dist = Math.abs(r - mid)
+      const cnt = Math.max(3, cols - dist * 2)
+      const sx = W / 2 - (cnt - 1) * ALIEN_GAP_X / 2
+      for (let c = 0; c < cnt; c++)
+        positions.push([sx + c * ALIEN_GAP_X, ALIEN_START_Y + r * ALIEN_GAP_Y, r])
+    }
+
+  } else if (formation === 'stagger') {
+    // 지그재그 — 홀수 행은 반 칸 오른쪽
+    const sx = W / 2 - (cols - 1) * ALIEN_GAP_X / 2
+    for (let r = 0; r < rows; r++) {
+      const offset = r % 2 === 1 ? ALIEN_GAP_X / 2 : 0
+      for (let c = 0; c < cols; c++)
+        positions.push([sx + c * ALIEN_GAP_X + offset, ALIEN_START_Y + r * ALIEN_GAP_Y, r])
+    }
+
+  } else {
+    // swarm — 촘촘하고 약간 랜덤한 군집
+    const sx = W / 2 - (cols - 1) * (ALIEN_GAP_X - 8) / 2
+    for (let r = 0; r < rows; r++)
+      for (let c = 0; c < cols; c++)
+        positions.push([
+          sx + c * (ALIEN_GAP_X - 8) + (Math.random() - 0.5) * 20,
+          ALIEN_START_Y + r * (ALIEN_GAP_Y - 6) + (Math.random() - 0.5) * 10,
+          r,
+        ])
   }
-  return aliens
+
+  // 웨이브별 적 구성 (후반일수록 강한 적 비중 증가)
+  return positions.map(([x, y, rowIdx]) => {
+    let cfgIdx
+    if (wave === 1) {
+      cfgIdx = rowIdx === 0 ? 0 : rowIdx === 1 ? 1 : 2
+    } else if (wave === 2) {
+      cfgIdx = rowIdx === 0 ? 0 : rowIdx <= 1 ? 3 : 1
+    } else if (wave === 3) {
+      cfgIdx = rowIdx <= 1 ? 0 : 3
+    } else if (wave === 4) {
+      cfgIdx = rowIdx === 0 ? 0 : rowIdx <= 2 ? 3 : 1
+    } else {
+      const r = Math.random()
+      cfgIdx = r < 0.3 ? 0 : r < 0.6 ? 3 : r < 0.8 ? 1 : 2
+    }
+    return {
+      x, y, cfgIdx,
+      hp: ALIEN_CFG[cfgIdx].hp,
+      frame: Math.floor(Math.random() * 40),
+      isDiver: false, dvx: 0, dvy: 0,
+    }
+  })
 }
 
-// 보스 이동 패턴: wave별로 다른 움직임
-const BOSS_PATTERNS = ['linear', 'linear', 'zigzag', 'pendulum', 'erratic']
+// 보스 이동 패턴
+const BOSS_PATTERNS = ['linear', 'zigzag', 'pendulum', 'erratic', 'erratic']
 
 function makeBoss(wave, diff) {
   const hp = Math.round(diff.bossHp * (1 + (wave - 1) * 0.6))
   const pattern = BOSS_PATTERNS[Math.min(wave - 1, BOSS_PATTERNS.length - 1)]
+  const typeIdx = Math.min(wave - 1, BOSS_TYPES.length - 1)
   return {
     x: W / 2, y: 90, baseY: 90,
     vx: 1.2 + wave * 0.2,
     hp, maxHp: hp,
     frame: 0, shootTimer: 0,
     nextShoot: Math.max(28, 58 - wave * 4),
-    pattern,
+    pattern, typeIdx,
+    spawnTimer: 0,      // spawner용
+    dashTimer: 0,       // dasher용
+    isDashing: false,
+    dashTarget: null,
+    shootCount: 0,
   }
 }
 
@@ -133,6 +217,7 @@ function makeInitialState(diff) {
     ufo: null,
     ufoTimer: 0,
     boss: null,
+    bossAnnounce: 0,
     explosions: [],
     stars: Array.from({ length: 80 }, () => ({
       x: Math.random() * W,
@@ -144,7 +229,7 @@ function makeInitialState(diff) {
     frame: 0,
     bulletTimer: 0,
     alienDx: diff.alienSpd,
-    alienTotal: getWaveCfg(1).cols * getWaveCfg(1).rows,
+    alienTotal: makeAliens(1).length,
     alienShootTimer: 0,
     nextAlienShoot: diff.fireMin + Math.floor(Math.random() * 40),
     alienDiveTimer: 0,
@@ -448,6 +533,7 @@ export default function SpaceGame({ onBack }) {
         // 전멸 → 보스
         if (s.aliens.length === 0) {
           s.boss = makeBoss(s.wave, diff)
+          s.bossAnnounce = 90
           s.wavePhase = 'boss'
           s.ufo = null
         }
@@ -460,13 +546,35 @@ export default function SpaceGame({ onBack }) {
       // ── 보스 페이즈 ───────────────────────────────────────────────
       } else if (s.boss) {
         const boss = s.boss
-        const bossRage = boss.hp / boss.maxHp < 0.3   // 분노 모드: HP 30% 이하
+        const ti = boss.typeIdx ?? 0
+        const bossRage = boss.hp / boss.maxHp < 0.3
         const bossSpd = (bossRage ? Math.abs(boss.vx) * 1.5 : Math.abs(boss.vx))
-        boss.x += boss.vx > 0 ? bossSpd : -bossSpd
         boss.frame++
-        if (boss.x > W - 80 || boss.x < 80) boss.vx *= -1
+        if (s.bossAnnounce > 0) s.bossAnnounce--
 
-        // 패턴별 수직 이동
+        // ── 수평 이동 (dasher는 대쉬 우선) ──
+        if (ti === 3 || ti === 4) {
+          // 대쉬 타이머
+          boss.dashTimer++
+          if (!boss.isDashing && boss.dashTimer >= 260) {
+            boss.dashTimer = 0
+            boss.isDashing = true
+            boss.dashTarget = boss.x < W / 2 ? W - 130 : 130
+          }
+          if (boss.isDashing) {
+            const dx = boss.dashTarget - boss.x
+            if (Math.abs(dx) < 14) { boss.x = boss.dashTarget; boss.isDashing = false }
+            else boss.x += Math.sign(dx) * 20
+          } else {
+            boss.x += boss.vx > 0 ? bossSpd : -bossSpd
+            if (boss.x > W - 80 || boss.x < 80) boss.vx *= -1
+          }
+        } else {
+          boss.x += boss.vx > 0 ? bossSpd : -bossSpd
+          if (boss.x > W - 80 || boss.x < 80) boss.vx *= -1
+        }
+
+        // ── 수직 이동 패턴 ──
         if (boss.pattern === 'zigzag') {
           boss.y = boss.baseY + Math.sin(boss.frame * 0.035) * 38
         } else if (boss.pattern === 'pendulum') {
@@ -476,48 +584,86 @@ export default function SpaceGame({ onBack }) {
         }
         if (bossRage) boss.y += Math.sin(boss.frame * 0.2) * 7
 
+        // ── 소환 (spawner / chaos) ──
+        if (ti === 2 || ti === 4) {
+          boss.spawnTimer++
+          const spawnInterval = ti === 4 ? 140 : 180
+          if (boss.spawnTimer >= spawnInterval) {
+            boss.spawnTimer = 0
+            const cnt = ti === 4 ? 3 : 2
+            for (let i = 0; i < cnt; i++) {
+              s.aliens.push({
+                x: boss.x + (i - (cnt - 1) / 2) * 70,
+                y: boss.y + 55,
+                cfgIdx: 2,
+                hp: 1,
+                frame: 0,
+                isDiver: true,
+                dvx: (Math.random() - 0.5) * 4,
+                dvy: 2.2 + Math.random(),
+              })
+            }
+            s.popups.push({ text: '소환!', x: boss.x, y: boss.y - 60, frame: 0, color: '#44ff88' })
+          }
+        }
+
+        // ── 사격 ──
         boss.shootTimer++
         const shootInterval = bossRage ? Math.ceil(boss.nextShoot * 0.65) : boss.nextShoot
         if (boss.shootTimer >= shootInterval) {
           const bx = boss.x, by = boss.y + 52
-          if (s.wave >= 3 || bossRage) {
-            // 5방향 부채꼴 — 속도 낮춤
-            const spd = ALIEN_BULLET_SPD + (bossRage ? 0.8 : 0.3)
+          const spd = ALIEN_BULLET_SPD + (bossRage ? 0.8 : 0.3)
+          boss.shootCount++
+
+          if (ti === 4 && boss.shootCount % 3 === 0) {
+            // chaos: 8방향 링
+            for (let i = 0; i < 8; i++) {
+              const ang = (i / 8) * Math.PI * 2
+              s.alienBullets.push({ x: bx, y: by, vx: Math.cos(ang) * spd, vy: Math.sin(ang) * spd })
+            }
+          } else if (ti >= 1 || bossRage) {
+            // blitz+: 5방향 부채꼴
             for (const vx of [-3.0, -1.5, 0, 1.5, 3.0]) {
               s.alienBullets.push({ x: bx, y: by, vx, vy: vx === 0 ? spd + 0.4 : spd })
             }
           } else {
-            // 3방향 — 속도 낮춤
+            // standard: 3방향
             s.alienBullets.push({ x: bx, y: by, vx: 0,    vy: ALIEN_BULLET_SPD + 0.8 })
             s.alienBullets.push({ x: bx, y: by, vx: -2.2, vy: ALIEN_BULLET_SPD - 0.3 })
             s.alienBullets.push({ x: bx, y: by, vx:  2.2, vy: ALIEN_BULLET_SPD - 0.3 })
           }
+          // dasher/chaos: 조준 추가
+          if (ti === 3 || ti === 4) {
+            const ang = Math.atan2(PLAYER_Y - by, s.player.x - bx)
+            s.alienBullets.push({ x: bx, y: by, vx: Math.cos(ang) * (spd + 1), vy: Math.sin(ang) * (spd + 1) })
+          }
           boss.shootTimer = 0
         }
 
-        // 총알 vs 보스
+        // ── 총알 vs 보스 ──
         let bossDefeated = false
         for (let bi = s.bullets.length - 1; bi >= 0; bi--) {
           const b = s.bullets[bi]
-          if (!b) continue   // 안전 가드
+          if (!b) continue
           if (Math.abs(b.x - boss.x) < 72 && Math.abs(b.y - boss.y) < 46) {
             boss.hp -= b.dmg
             s.bullets.splice(bi, 1)
-            if (boss.hp <= 0) { bossDefeated = true; break }  // ← 루프 즉시 탈출
+            if (boss.hp <= 0) { bossDefeated = true; break }
           }
         }
         if (bossDefeated) {
+          const bossColor = BOSS_TYPES[ti].color
           s.score += 100 * s.wave
-          s.explosions.push({ x: boss.x, y: boss.y, frame: 0, max: 45, r: 72, color: '#bb44ff' })
+          s.explosions.push({ x: boss.x, y: boss.y, frame: 0, max: 45, r: 72, color: bossColor })
           spawnItem(s, boss.x, boss.y, 2)
           s.boss = null
           s.wave++
           s.wavePhase = 'transition'
           s.transitionReady = false
-          // 게임보드 정리
           s.bullets = []
           s.alienBullets = []
           s.items = []
+          s.aliens = []   // spawner가 소환한 미니언도 정리
           s.ufoTimer = 0
         }
       }
@@ -526,9 +672,8 @@ export default function SpaceGame({ onBack }) {
       if (s.wavePhase === 'transition') {
         if (s.transitionReady) {
           s.transitionReady = false
-          const nextWcfg = getWaveCfg(s.wave)
           s.aliens = makeAliens(s.wave)
-          s.alienTotal = nextWcfg.cols * nextWcfg.rows
+          s.alienTotal = s.aliens.length
           s.alienDx = diff.alienSpd * (1 + (s.wave - 1) * 0.18)
           s.nextAlienShoot = diff.fireMin + Math.floor(Math.random() * 40)
           s.alienShootTimer = 0
@@ -843,6 +988,22 @@ function drawScene(ctx, s) {
     ctx.restore()
     ctx.textAlign = 'left'
   }
+
+  // 보스 등장 알림
+  if (s.bossAnnounce > 0 && s.boss) {
+    const timer = s.bossAnnounce
+    let alpha = timer > 70 ? (90 - timer) / 20 : timer < 20 ? timer / 20 : 1
+    const bt = BOSS_TYPES[s.boss.typeIdx ?? 0]
+    ctx.save()
+    ctx.globalAlpha = alpha
+    ctx.textAlign = 'center'
+    ctx.font = 'bold 42px sans-serif'
+    ctx.fillStyle = bt.color
+    ctx.shadowColor = bt.color; ctx.shadowBlur = 30
+    ctx.fillText(`⚠ ${bt.label} 등장! ⚠`, W / 2, H / 2 + 72)
+    ctx.restore()
+    ctx.textAlign = 'left'
+  }
 }
 
 function drawUfo(ctx, ufo) {
@@ -963,35 +1124,100 @@ function drawPlayer(ctx, player, powerups, frame) {
 }
 
 function drawBoss(ctx, boss) {
-  const { x, y, frame, hp, maxHp } = boss
+  const { x, y, frame, hp, maxHp, typeIdx = 0, isDashing } = boss
+  const bt = BOSS_TYPES[typeIdx]
   const pulse = Math.sin(frame * 0.12) * 4
   const hpRatio = hp / maxHp
+  const rage = hpRatio < 0.3
 
   ctx.save()
   ctx.translate(x, y)
-  ctx.shadowColor = '#bb44ff'; ctx.shadowBlur = 24
 
+  // 대쉬 잔상 (dasher / chaos)
+  if (isDashing && (typeIdx === 3 || typeIdx === 4)) {
+    ctx.globalAlpha = 0.25
+    ctx.shadowColor = bt.color; ctx.shadowBlur = 30
+    ctx.fillStyle = bt.color
+    ctx.beginPath()
+    ctx.ellipse(0, 10, 72, 26, 0, 0, Math.PI * 2)
+    ctx.fill()
+    ctx.globalAlpha = 1
+  }
+
+  // 본체
+  ctx.shadowColor = bt.color; ctx.shadowBlur = rage ? 36 : 24
   const g = ctx.createRadialGradient(0, 5, 5, 0, 5, 74)
-  g.addColorStop(0, `hsl(${280 - hpRatio * 60}, 80%, 65%)`)
-  g.addColorStop(1, '#330055')
+  // 타입별 색조 변화
+  const hue = [280, 0, 140, 210, 38][typeIdx]
+  g.addColorStop(0, `hsl(${hue + (rage ? 30 : 0) - hpRatio * 40}, 80%, 62%)`)
+  g.addColorStop(1, bt.bg)
   ctx.fillStyle = g
   ctx.beginPath()
   ctx.ellipse(0, 10, 72 + pulse, 26, 0, 0, Math.PI * 2)
   ctx.fill()
 
-  ctx.fillStyle = '#dd99ff'
-  ctx.shadowColor = '#dd99ff'; ctx.shadowBlur = 10
+  // 돔 (타입별 색)
+  ctx.fillStyle = bt.color + 'cc'
+  ctx.shadowColor = bt.color; ctx.shadowBlur = 10
   ctx.beginPath()
   ctx.ellipse(0, -8, 38, 32, 0, Math.PI, Math.PI * 2)
   ctx.fill()
 
-  const eyeColor = hpRatio < 0.4 ? '#ff0000' : '#ff0033'
-  const eyeR = hpRatio < 0.4 ? 10 + Math.sin(frame * 0.3) * 2 : 8
+  // 눈 (rage 시 빨갛게)
+  const eyeColor = rage ? '#ff0000' : bt.color
+  const eyeR = rage ? 10 + Math.sin(frame * 0.3) * 2 : 8
   ctx.fillStyle = eyeColor
-  ctx.shadowColor = eyeColor; ctx.shadowBlur = hpRatio < 0.4 ? 22 : 14
+  ctx.shadowColor = eyeColor; ctx.shadowBlur = rage ? 24 : 14
   ctx.beginPath(); ctx.arc(-20, -12, eyeR, 0, Math.PI * 2); ctx.fill()
   ctx.beginPath(); ctx.arc( 20, -12, eyeR, 0, Math.PI * 2); ctx.fill()
 
+  // 타입별 특수 장식
+  ctx.shadowBlur = 0
+  if (typeIdx === 1) {
+    // blitz: 불꽃 날개
+    ctx.fillStyle = '#ff6622'
+    ctx.globalAlpha = 0.7 + Math.sin(frame * 0.35) * 0.2
+    ctx.beginPath()
+    ctx.moveTo(-72, 10); ctx.lineTo(-95, -10 + Math.sin(frame * 0.25) * 12); ctx.lineTo(-55, 18)
+    ctx.closePath(); ctx.fill()
+    ctx.beginPath()
+    ctx.moveTo( 72, 10); ctx.lineTo( 95, -10 + Math.sin(frame * 0.25) * 12); ctx.lineTo( 55, 18)
+    ctx.closePath(); ctx.fill()
+    ctx.globalAlpha = 1
+  } else if (typeIdx === 2) {
+    // spawner: 촉수
+    ctx.strokeStyle = '#44ff88'; ctx.lineWidth = 3
+    for (let i = -1; i <= 1; i++) {
+      ctx.beginPath()
+      ctx.moveTo(i * 30, 24)
+      ctx.quadraticCurveTo(i * 50 + Math.sin(frame * 0.1 + i) * 10, 44, i * 40, 58)
+      ctx.stroke()
+    }
+  } else if (typeIdx === 3) {
+    // dasher: 전기 효과
+    ctx.strokeStyle = '#88ddff'; ctx.lineWidth = 2; ctx.globalAlpha = 0.7
+    for (let i = 0; i < 4; i++) {
+      const ang = (i / 4) * Math.PI * 2 + frame * 0.05
+      ctx.beginPath()
+      ctx.moveTo(Math.cos(ang) * 72, Math.sin(ang) * 26 + 10)
+      ctx.lineTo(Math.cos(ang + 0.3) * 88, Math.sin(ang + 0.3) * 30 + 10)
+      ctx.stroke()
+    }
+    ctx.globalAlpha = 1
+  } else if (typeIdx === 4) {
+    // chaos: 회전 링
+    ctx.strokeStyle = bt.color; ctx.lineWidth = 2; ctx.globalAlpha = 0.5
+    const rot = frame * 0.04
+    for (let i = 0; i < 6; i++) {
+      const a = rot + (i / 6) * Math.PI * 2
+      ctx.beginPath()
+      ctx.arc(Math.cos(a) * 80, Math.sin(a) * 28 + 10, 5, 0, Math.PI * 2)
+      ctx.stroke()
+    }
+    ctx.globalAlpha = 1
+  }
+
+  // 포탑
   ctx.fillStyle = '#555'; ctx.shadowBlur = 0
   ctx.fillRect(-5, 26, 10, 22)
   ctx.fillRect(-26, 18, 8, 16)
@@ -999,16 +1225,19 @@ function drawBoss(ctx, boss) {
 
   ctx.restore()
 
-  const bw = 160, bh = 10
-  const bx = x - bw / 2, by = y - 62
+  // HP 바 + 레이블
+  const bw = 180, bh = 10
+  const bx = x - bw / 2, by = y - 66
   ctx.fillStyle = '#222'; ctx.fillRect(bx, by, bw, bh)
-  ctx.fillStyle = `hsl(${hpRatio * 120}, 80%, 50%)`
+  ctx.fillStyle = rage ? '#ff4400' : `hsl(${hpRatio * 120}, 80%, 50%)`
+  ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = rage ? 8 : 0
   ctx.fillRect(bx, by, bw * hpRatio, bh)
-  ctx.strokeStyle = '#555'; ctx.lineWidth = 1; ctx.strokeRect(bx, by, bw, bh)
-  ctx.fillStyle = '#aaa'
-  ctx.font = 'bold 10px sans-serif'
+  ctx.shadowBlur = 0
+  ctx.strokeStyle = bt.color + '88'; ctx.lineWidth = 1; ctx.strokeRect(bx, by, bw, bh)
+  ctx.fillStyle = bt.color
+  ctx.font = `bold 11px sans-serif`
   ctx.textAlign = 'center'
-  ctx.fillText('BOSS', x, by - 3)
+  ctx.fillText(bt.label, x, by - 3)
   ctx.textAlign = 'left'
 }
 
