@@ -76,14 +76,19 @@ function makeAliens(wave = 1) {
   return aliens
 }
 
+// 보스 이동 패턴: wave별로 다른 움직임
+const BOSS_PATTERNS = ['linear', 'linear', 'zigzag', 'pendulum', 'erratic']
+
 function makeBoss(wave, diff) {
   const hp = Math.round(diff.bossHp * (1 + (wave - 1) * 0.6))
+  const pattern = BOSS_PATTERNS[Math.min(wave - 1, BOSS_PATTERNS.length - 1)]
   return {
-    x: W / 2, y: 90,
-    vx: 1.4 + wave * 0.25,
+    x: W / 2, y: 90, baseY: 90,
+    vx: 1.2 + wave * 0.2,
     hp, maxHp: hp,
     frame: 0, shootTimer: 0,
-    nextShoot: Math.max(24, 55 - wave * 4),
+    nextShoot: Math.max(28, 58 - wave * 4),
+    pattern,
   }
 }
 
@@ -1053,6 +1058,7 @@ const st = {
     borderRadius: 12,
     boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
     touchAction: 'none',
+    marginBottom: 12,
   },
   scoreCard: {
     background: '#1e1e2e',

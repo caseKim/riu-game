@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 
 const COLS = 8
 const ROWS = 8
@@ -202,6 +202,9 @@ export default function MatchGame({ onBack }) {
   const scoreRef = useRef(0)
   const movesRef = useRef(MAX_MOVES)
   const comboKeyRef = useRef(0)
+  const gridElRef = useRef(null)   // DOM ref — touch events attached here
+  const doSwapRef = useRef(null)   // always-current swap fn (used by touch handler)
+  const handleTapRef = useRef(null) // always-current tap fn (used by touch handler)
 
   function startGame() {
     busyRef.current = false
@@ -296,39 +299,25 @@ export default function MatchGame({ onBack }) {
     }, 330)
   }
 
-  function handleCellClick(i) {
-    if (phase !== 'playing' || busyRef.current) return
-
-    if (selected === null) {
-      if (grid[i]) setSelected(i)
-      return
-    }
-    if (selected === i) { setSelected(null); return }
-
-    const { r: r1, c: c1 } = cellPos(selected)
-    const { r: r2, c: c2 } = cellPos(i)
-    const isAdj = (Math.abs(r1 - r2) === 1 && c1 === c2) || (r1 === r2 && Math.abs(c1 - c2) === 1)
-    if (!isAdj) { setSelected(i); return }
-
-    const fromIdx = selected
+  // Shared swap logic — called by both click and touch drag
+  function performSwap(fromIdx, toIdx) {
+    const { r: r1, c: c1 } = cellPos(fromIdx)
+    const { r: r2, c: c2 } = cellPos(toIdx)
     const dr = r2 - r1
     const dc = c2 - c1
     setSelected(null)
     busyRef.current = true
-
-    // Start swap animation
-    setSwapAnim({ from: fromIdx, to: i, dr, dc })
+    setSwapAnim({ from: fromIdx, to: toIdx, dr, dc })
 
     setTimeout(() => {
       const swapped = [...grid]
-      ;[swapped[fromIdx], swapped[i]] = [swapped[i], swapped[fromIdx]]
+      ;[swapped[fromIdx], swapped[toIdx]] = [swapped[toIdx], swapped[fromIdx]]
 
-      const a = swapped[i]
+      const a = swapped[toIdx]
       const b = swapped[fromIdx]
       const hasSpecial = a?.kind !== 'normal' || b?.kind !== 'normal'
 
       if (!hasSpecial && findMatches(swapped).length === 0) {
-        // Invalid — animate back
         setSwapAnim(null)
         setTimeout(() => { busyRef.current = false }, 200)
         return
@@ -339,14 +328,12 @@ export default function MatchGame({ onBack }) {
       setSwapAnim(null)
 
       if (hasSpecial) {
-        // Flash the cells that will be cleared, then activate
-        const { cleared, kind } = getSpecialAnimInfo(swapped, i, fromIdx)
+        const { cleared, kind } = getSpecialAnimInfo(swapped, toIdx, fromIdx)
         setFlashSet(cleared)
         setFlashKind(kind)
         setGrid(swapped)
-
         setTimeout(() => {
-          const afterSpecial = activateSpecialSwap(swapped, i, fromIdx)
+          const afterSpecial = activateSpecialSwap(swapped, toIdx, fromIdx)
           const { g: fallen, freshIds } = applyGravity(afterSpecial)
           setFlashSet(new Set())
           setFallingIds(freshIds)
@@ -355,10 +342,73 @@ export default function MatchGame({ onBack }) {
         }, 360)
       } else {
         setGrid(swapped)
-        processChain(swapped, i, 1)
+        processChain(swapped, toIdx, 1)
       }
     }, 160)
   }
+
+  function handleCellClick(i) {
+    if (phase !== 'playing' || busyRef.current) return
+    if (selected === null) {
+      if (grid[i]) setSelected(i)
+      return
+    }
+    if (selected === i) { setSelected(null); return }
+    const { r: r1, c: c1 } = cellPos(selected)
+    const { r: r2, c: c2 } = cellPos(i)
+    const isAdj = (Math.abs(r1 - r2) === 1 && c1 === c2) || (r1 === r2 && Math.abs(c1 - c2) === 1)
+    if (!isAdj) { setSelected(i); return }
+    performSwap(selected, i)
+  }
+
+  // Keep refs current every render so touch handler always has latest closures
+  doSwapRef.current = performSwap
+  handleTapRef.current = handleCellClick
+
+  // Attach touch events once — passive: false so we can call preventDefault
+  useEffect(() => {
+    const el = gridElRef.current
+    if (!el) return
+    let drag = null
+
+    const onTouchStart = (e) => {
+      e.preventDefault()
+      const touch = e.touches[0]
+      const target = document.elementFromPoint(touch.clientX, touch.clientY)
+      const btn = target?.closest('[data-ci]')
+      if (!btn) return
+      drag = { startX: touch.clientX, startY: touch.clientY, fromIdx: parseInt(btn.dataset.ci) }
+    }
+    const onTouchMove  = (e) => { e.preventDefault() }
+    const onTouchEnd   = (e) => {
+      if (!drag) return
+      const touch = e.changedTouches[0]
+      const { startX, startY, fromIdx } = drag
+      drag = null
+      const dx = touch.clientX - startX
+      const dy = touch.clientY - startY
+      if (Math.abs(dx) < 14 && Math.abs(dy) < 14) {
+        handleTapRef.current?.(fromIdx)
+        return
+      }
+      let dr = 0, dc = 0
+      if (Math.abs(dx) > Math.abs(dy)) dc = dx > 0 ? 1 : -1
+      else dr = dy > 0 ? 1 : -1
+      const { r, c } = cellPos(fromIdx)
+      const toR = r + dr, toC = c + dc
+      if (!inBounds(toR, toC)) return
+      doSwapRef.current?.(fromIdx, cellIdx(toR, toC))
+    }
+
+    el.addEventListener('touchstart', onTouchStart, { passive: false })
+    el.addEventListener('touchmove',  onTouchMove,  { passive: false })
+    el.addEventListener('touchend',   onTouchEnd)
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove',  onTouchMove)
+      el.removeEventListener('touchend',   onTouchEnd)
+    }
+  }, [])
 
   return (
     <div style={s.wrapper}>
@@ -413,9 +463,8 @@ export default function MatchGame({ onBack }) {
       {/* Game area */}
       <div style={s.gameArea}>
         {/* Grid */}
-        <div style={s.gridWrap}>
-          <div style={s.grid}>
-            {grid.map((cell, i) => {
+        <div ref={gridElRef} style={s.grid}>
+          {grid.map((cell, i) => {
               const isSel = selected === i
               const isFlash = flashSet.has(i)
               const isFalling = cell && fallingIds.has(cell.id)
@@ -463,6 +512,7 @@ export default function MatchGame({ onBack }) {
               return (
                 <button
                   key={cell?.id ?? i}
+                  data-ci={i}
                   style={{
                     ...s.cell,
                     background: cell ? GEM_BG[cell.color] : 'rgba(255,255,255,0.03)',
@@ -478,12 +528,11 @@ export default function MatchGame({ onBack }) {
                   }}
                   onClick={() => handleCellClick(i)}
                 >
-                  {emoji && <span style={{ fontSize: 'clamp(15px, 3.8vw, 24px)', lineHeight: 1 }}>{emoji}</span>}
+                  {emoji && <span style={{ fontSize: 'clamp(15px, 3.8vw, 24px)', lineHeight: 1, pointerEvents: 'none' }}>{emoji}</span>}
                   {badge && <span style={s.badge}>{badge}</span>}
                 </button>
               )
             })}
-          </div>
         </div>
 
         {/* Score card — below grid, same style as other games */}
@@ -597,9 +646,6 @@ const s = {
     maxWidth: 520,
     margin: '0 auto',
   },
-  gridWrap: {
-    width: '100%',
-  },
   grid: {
     display: 'grid',
     gridTemplateColumns: 'repeat(8, 1fr)',
@@ -608,11 +654,12 @@ const s = {
     aspectRatio: '1',
     background: '#11112a',
     border: '4px solid #FFD700',
-    borderBottom: 'none',
-    borderRadius: '14px 14px 0 0',
+    borderRadius: 12,
     padding: 'clamp(4px, 1.2vw, 10px)',
     boxSizing: 'border-box',
     boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
+    touchAction: 'none',
+    marginBottom: 12,
   },
   cell: {
     position: 'relative',
@@ -636,11 +683,9 @@ const s = {
   },
   scoreCard: {
     background: '#1e1e2e',
-    border: '4px solid #FFD700',
-    borderTop: 'none',
-    borderRadius: '0 0 12px 12px',
+    border: '1px solid #333',
+    borderRadius: 12,
     padding: '10px 16px',
-    boxShadow: '0 8px 40px rgba(0,0,0,0.6)',
   },
   scoreRow: {
     display: 'flex',
