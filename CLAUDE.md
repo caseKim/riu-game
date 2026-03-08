@@ -48,9 +48,37 @@ App
 
 ### Adding a new game
 
-1. Add entry to `GAMES` array in `GameSelect.jsx` with `available: true`
-2. Create `src/components/YourGame.jsx` — must accept `{ onBack }` prop
-3. Import and add `if (gameId === 'your-id') return <YourGame onBack={...} />` in `App.jsx`
+1. Copy `src/components/GameTemplate.jsx` → `src/components/YourGame.jsx`
+2. Fill in the 6 `TODO` comments (GAME_ID, canvas size, DIFF_SETTINGS, update/collision/draw logic)
+3. Add entry to `GAMES` array in `GameSelect.jsx` with `available: true`
+4. Import and add `if (gameId === 'your-id') return <YourGame onBack={...} />` in `App.jsx`
+
+### Shared utilities (`src/utils/gameUtils.js`)
+
+Import from here instead of writing boilerplate each time:
+
+```js
+import { getBest, saveBest, getSavedDiff, saveDiff,
+         drawEmoji, drawText, fillRoundRect, fillCircle,
+         dist, randInt, clamp, hitRect, hitCircle,
+         COLORS, STYLES } from '../utils/gameUtils'
+```
+
+| Export | Purpose |
+|--------|---------|
+| `getBest(gameId, diffId)` | localStorage 베스트 스코어 읽기 |
+| `saveBest(gameId, diffId, score)` | 갱신 시에만 저장, `true` 반환 |
+| `getSavedDiff(gameId, diffs)` | 저장된 난이도 객체 반환 |
+| `saveDiff(gameId, diffId)` | 난이도 저장 |
+| `drawEmoji(ctx, emoji, x, y, size, glow?)` | 이모지 그리기 |
+| `drawText(ctx, text, x, y, opts?)` | 텍스트 그리기 |
+| `fillRoundRect / fillCircle` | 도형 단축 |
+| `dist / randInt / clamp` | 수학 유틸 |
+| `hitRect(a, b) / hitCircle(...)` | 충돌 감지 |
+| `COLORS` | 디자인 토큰 (bg, card, gold, border, muted) |
+| `STYLES` | 공통 인라인 스타일 (root, header, canvas, overlay, hud 등) |
+
+localStorage 키 규칙: `{gameId}_best_{diffId}`, `{gameId}_diff`
 
 ### State management
 
@@ -107,12 +135,18 @@ Fruits (`FRUITS` array of emoji) spawn on a separate timer (`fruitTimer` / `next
 
 ### Styling
 
-All styles are inline JS objects (no CSS modules or Tailwind). Both screens share the same design language:
-- Background: `#0f0f1e`
-- Cards: `background: #1e1e2e`, `border: 2px solid #333`, `borderRadius: 14`
-- Title: `color: #FFD700`, `textShadow` glow
+All styles are inline JS objects (no CSS modules or Tailwind). Common tokens and style objects live in `COLORS` / `STYLES` from `gameUtils.js`. Game-specific styles extend `STYLES` with spreads:
+
+```js
+const S = { ...STYLES, myCustomStyle: { ... } }
+```
+
+Design language:
+- Background: `#0f0f1e` (`COLORS.bg`)
+- Cards: `#1e1e2e` / `border: 2px solid #333` (`COLORS.card` / `COLORS.border`)
+- Title: `#FFD700` glow (`COLORS.gold`)
 - All sizes use `clamp()` for mobile responsiveness
-- Canvas scales via CSS `width: 100%; height: auto` — internal resolution stays 1000×420
+- Canvas scales via CSS `width: 100%; height: auto`
 
 ---
 
