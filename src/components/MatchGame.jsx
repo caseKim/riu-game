@@ -97,20 +97,37 @@ function applyGravity(g) {
   return { g: newG, freshIds }
 }
 
-function activateAt(g, i) {
+function activateAt(g, i, visited = new Set()) {
+  if (visited.has(i)) return g
+  visited.add(i)
   const { r, c } = cellPos(i)
   const cell = g[i]
-  const newG = [...g]
-  newG[i] = null
-  if (!cell) return newG
-  if (cell.kind === 'hline') for (let cc = 0; cc < COLS; cc++) newG[cellIdx(r, cc)] = null
-  else if (cell.kind === 'vline') for (let rr = 0; rr < ROWS; rr++) newG[cellIdx(rr, c)] = null
-  else if (cell.kind === 'bomb') {
+  let cur = [...g]
+  cur[i] = null
+  if (!cell) return cur
+
+  const toVisit = []
+  if (cell.kind === 'hline') {
+    for (let cc = 0; cc < COLS; cc++) toVisit.push(cellIdx(r, cc))
+  } else if (cell.kind === 'vline') {
+    for (let rr = 0; rr < ROWS; rr++) toVisit.push(cellIdx(rr, c))
+  } else if (cell.kind === 'bomb') {
     for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-      if (inBounds(r + dr, c + dc)) newG[cellIdx(r + dr, c + dc)] = null
+      if (inBounds(r + dr, c + dc)) toVisit.push(cellIdx(r + dr, c + dc))
     }
   }
-  return newG
+
+  for (const pos of toVisit) {
+    if (visited.has(pos)) continue
+    const target = cur[pos]
+    if (target && target.kind !== 'normal' && target.kind !== 'rainbow') {
+      cur = activateAt(cur, pos, visited)
+    } else {
+      visited.add(pos)
+      cur[pos] = null
+    }
+  }
+  return cur
 }
 
 function activateSpecialSwap(g, posA, posB) {
@@ -365,29 +382,19 @@ export default function MatchGame({ onBack }) {
   doSwapRef.current = performSwap
   handleTapRef.current = handleCellClick
 
-  // Attach touch events once — passive: false so we can call preventDefault
+  // Attach touch + mouse events — passive: false so we can call preventDefault
   useEffect(() => {
     const el = gridElRef.current
     if (!el) return
     let drag = null
 
-    const onTouchStart = (e) => {
-      e.preventDefault()
-      const touch = e.touches[0]
-      const target = document.elementFromPoint(touch.clientX, touch.clientY)
-      const btn = target?.closest('[data-ci]')
-      if (!btn) return
-      drag = { startX: touch.clientX, startY: touch.clientY, fromIdx: parseInt(btn.dataset.ci) }
-    }
-    const onTouchMove  = (e) => { e.preventDefault() }
-    const onTouchEnd   = (e) => {
+    function resolveDrag(endX, endY) {
       if (!drag) return
-      const touch = e.changedTouches[0]
       const { startX, startY, fromIdx } = drag
       drag = null
-      const dx = touch.clientX - startX
-      const dy = touch.clientY - startY
-      if (Math.abs(dx) < 14 && Math.abs(dy) < 14) {
+      const dx = endX - startX
+      const dy = endY - startY
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10) {
         handleTapRef.current?.(fromIdx)
         return
       }
@@ -400,13 +407,43 @@ export default function MatchGame({ onBack }) {
       doSwapRef.current?.(fromIdx, cellIdx(toR, toC))
     }
 
-    el.addEventListener('touchstart', onTouchStart, { passive: false })
-    el.addEventListener('touchmove',  onTouchMove,  { passive: false })
-    el.addEventListener('touchend',   onTouchEnd)
+    // Touch
+    const onTouchStart = (e) => {
+      e.preventDefault()
+      const touch = e.touches[0]
+      const target = document.elementFromPoint(touch.clientX, touch.clientY)
+      const btn = target?.closest('[data-ci]')
+      if (!btn) return
+      drag = { startX: touch.clientX, startY: touch.clientY, fromIdx: parseInt(btn.dataset.ci) }
+    }
+    const onTouchMove = (e) => { e.preventDefault() }
+    const onTouchEnd  = (e) => {
+      const touch = e.changedTouches[0]
+      resolveDrag(touch.clientX, touch.clientY)
+    }
+
+    // Mouse (PC)
+    const onMouseDown = (e) => {
+      const btn = e.target.closest('[data-ci]')
+      if (!btn) return
+      drag = { startX: e.clientX, startY: e.clientY, fromIdx: parseInt(btn.dataset.ci) }
+    }
+    const onMouseUp = (e) => { resolveDrag(e.clientX, e.clientY) }
+    const onMouseLeave = () => { drag = null }
+
+    el.addEventListener('touchstart',  onTouchStart, { passive: false })
+    el.addEventListener('touchmove',   onTouchMove,  { passive: false })
+    el.addEventListener('touchend',    onTouchEnd)
+    el.addEventListener('mousedown',   onMouseDown)
+    el.addEventListener('mouseleave',  onMouseLeave)
+    document.addEventListener('mouseup', onMouseUp)
     return () => {
-      el.removeEventListener('touchstart', onTouchStart)
-      el.removeEventListener('touchmove',  onTouchMove)
-      el.removeEventListener('touchend',   onTouchEnd)
+      el.removeEventListener('touchstart',  onTouchStart)
+      el.removeEventListener('touchmove',   onTouchMove)
+      el.removeEventListener('touchend',    onTouchEnd)
+      el.removeEventListener('mousedown',   onMouseDown)
+      el.removeEventListener('mouseleave',  onMouseLeave)
+      document.removeEventListener('mouseup', onMouseUp)
     }
   }, [])
 
@@ -492,15 +529,12 @@ export default function MatchGame({ onBack }) {
               }
 
               let emoji = null
-              let badge = null
               if (cell) {
                 if (cell.kind === 'rainbow') emoji = '🌈'
-                else {
-                  emoji = GEMS[cell.color]
-                  if (cell.kind === 'hline') badge = '↔'
-                  else if (cell.kind === 'vline') badge = '↕'
-                  else if (cell.kind === 'bomb') badge = '💣'
-                }
+                else if (cell.kind === 'hline') emoji = '↔️'
+                else if (cell.kind === 'vline') emoji = '↕️'
+                else if (cell.kind === 'bomb') emoji = '💣'
+                else emoji = GEMS[cell.color]
               }
 
               const transitionProp = swapTranslate
@@ -526,10 +560,8 @@ export default function MatchGame({ onBack }) {
                     transition: transitionProp,
                     zIndex: swapTranslate ? 2 : 1,
                   }}
-                  onClick={() => handleCellClick(i)}
                 >
                   {emoji && <span style={{ fontSize: 'clamp(15px, 3.8vw, 24px)', lineHeight: 1, pointerEvents: 'none' }}>{emoji}</span>}
-                  {badge && <span style={s.badge}>{badge}</span>}
                 </button>
               )
             })}
@@ -672,14 +704,6 @@ const s = {
     aspectRatio: '1',
     padding: 0,
     minWidth: 0,
-  },
-  badge: {
-    position: 'absolute',
-    bottom: 1,
-    right: 2,
-    fontSize: 9,
-    lineHeight: 1,
-    pointerEvents: 'none',
   },
   scoreCard: {
     background: '#1e1e2e',
