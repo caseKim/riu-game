@@ -155,42 +155,6 @@ function activateSpecialSwap(g, posA, posB) {
   return newG
 }
 
-// Compute which cells a special swap will clear, and the dominant kind for animation
-function getSpecialAnimInfo(g, posA, posB) {
-  const a = g[posA], b = g[posB]
-  const cleared = new Set()
-  let kind = 'bomb'
-  if (a?.kind === 'rainbow' || b?.kind === 'rainbow') {
-    kind = 'rainbow'
-    const rainbowPos = a?.kind === 'rainbow' ? posA : posB
-    const partnerPos = rainbowPos === posA ? posB : posA
-    const partner = g[partnerPos]
-    cleared.add(rainbowPos)
-    if (partner?.kind === 'rainbow') {
-      for (let i = 0; i < g.length; i++) { if (g[i]) cleared.add(i) }
-    } else {
-      for (let i = 0; i < g.length; i++) { if (g[i]?.color === (partner?.color ?? 0)) cleared.add(i) }
-      cleared.add(partnerPos)
-    }
-  } else {
-    const specs = []
-    if (a?.kind !== 'normal') specs.push({ k: a.kind, pos: posA })
-    if (b?.kind !== 'normal') specs.push({ k: b.kind, pos: posB })
-    kind = specs.length === 1 ? specs[0].k : 'bomb'
-    specs.forEach(({ k, pos }) => {
-      cleared.add(pos)
-      const { r, c } = cellPos(pos)
-      if (k === 'hline') for (let cc = 0; cc < COLS; cc++) cleared.add(cellIdx(r, cc))
-      else if (k === 'vline') for (let rr = 0; rr < ROWS; rr++) cleared.add(cellIdx(rr, c))
-      else if (k === 'bomb') {
-        for (let dr = -1; dr <= 1; dr++) for (let dc = -1; dc <= 1; dc++) {
-          if (inBounds(r + dr, c + dc)) cleared.add(cellIdx(r + dr, c + dc))
-        }
-      }
-    })
-  }
-  return { cleared, kind }
-}
 
 // Pick the CSS animation name for a flash kind
 function flashAnim(kind) {
@@ -345,12 +309,23 @@ export default function MatchGame({ onBack }) {
       setSwapAnim(null)
 
       if (hasSpecial) {
-        const { cleared, kind } = getSpecialAnimInfo(swapped, toIdx, fromIdx)
-        setFlashSet(cleared)
+        // Run activation upfront to get the full result (including chain reactions)
+        const afterSpecial = activateSpecialSwap(swapped, toIdx, fromIdx)
+        // Collect every cell that will actually be cleared — including chain-activated ones
+        const fullCleared = new Set()
+        for (let i = 0; i < swapped.length; i++) {
+          if (swapped[i] !== null && afterSpecial[i] === null) fullCleared.add(i)
+        }
+        // Dominant animation kind from the directly swapped specials
+        const ak = swapped[toIdx]?.kind, bk = swapped[fromIdx]?.kind
+        const kind = (ak === 'rainbow' || bk === 'rainbow') ? 'rainbow'
+          : (ak === 'hline' || bk === 'hline') ? 'hline'
+          : (ak === 'vline' || bk === 'vline') ? 'vline'
+          : 'bomb'
+        setFlashSet(fullCleared)
         setFlashKind(kind)
         setGrid(swapped)
         setTimeout(() => {
-          const afterSpecial = activateSpecialSwap(swapped, toIdx, fromIdx)
           const { g: fallen, freshIds } = applyGravity(afterSpecial)
           setFlashSet(new Set())
           setFallingIds(freshIds)
