@@ -398,7 +398,6 @@ export default function SpaceGame({ onBack }) {
             }
             return true
           })
-          if (s.ended) return
         }
 
         // 사인파 진동 (wave 5+) — 포메이션 전체에 상하 진동 추가
@@ -453,59 +452,73 @@ export default function SpaceGame({ onBack }) {
           s.ufo = null
         }
 
-        // 외계인이 바닥까지 → 게임 오버
+        // 외계인이 바닥까지 → 게임 오버 (return 대신 break → RAF 정상 종료)
         for (const a of s.aliens) {
-          if (!a.isDiver && a.y + ALIEN_H / 2 > PLAYER_Y - 10) { endGame(s.score); return }
+          if (!a.isDiver && a.y + ALIEN_H / 2 > PLAYER_Y - 10) { endGame(s.score); break }
         }
 
       // ── 보스 페이즈 ───────────────────────────────────────────────
       } else if (s.boss) {
         const boss = s.boss
         const bossRage = boss.hp / boss.maxHp < 0.3   // 분노 모드: HP 30% 이하
-        const bossSpd = bossRage ? Math.abs(boss.vx) * 1.6 : Math.abs(boss.vx)
+        const bossSpd = (bossRage ? Math.abs(boss.vx) * 1.5 : Math.abs(boss.vx))
         boss.x += boss.vx > 0 ? bossSpd : -bossSpd
         boss.frame++
         if (boss.x > W - 80 || boss.x < 80) boss.vx *= -1
 
+        // 패턴별 수직 이동
+        if (boss.pattern === 'zigzag') {
+          boss.y = boss.baseY + Math.sin(boss.frame * 0.035) * 38
+        } else if (boss.pattern === 'pendulum') {
+          boss.y = boss.baseY + Math.sin(boss.frame * 0.025) * 58 + Math.sin(boss.frame * 0.07) * 18
+        } else if (boss.pattern === 'erratic') {
+          boss.y = boss.baseY + Math.sin(boss.frame * 0.05) * 44 + Math.sin(boss.frame * 0.019) * 30
+        }
+        if (bossRage) boss.y += Math.sin(boss.frame * 0.2) * 7
+
         boss.shootTimer++
-        const shootInterval = bossRage ? Math.ceil(boss.nextShoot * 0.6) : boss.nextShoot
+        const shootInterval = bossRage ? Math.ceil(boss.nextShoot * 0.65) : boss.nextShoot
         if (boss.shootTimer >= shootInterval) {
           const bx = boss.x, by = boss.y + 52
           if (s.wave >= 3 || bossRage) {
-            // 5방향 부채꼴 (wave 3+ 또는 분노 시)
-            const spd = ALIEN_BULLET_SPD + 1.2 + (bossRage ? 1 : 0)
-            for (const vx of [-4.2, -2.0, 0, 2.0, 4.2]) {
-              s.alienBullets.push({ x: bx, y: by, vx, vy: vx === 0 ? spd + 0.5 : spd })
+            // 5방향 부채꼴 — 속도 낮춤
+            const spd = ALIEN_BULLET_SPD + (bossRage ? 0.8 : 0.3)
+            for (const vx of [-3.0, -1.5, 0, 1.5, 3.0]) {
+              s.alienBullets.push({ x: bx, y: by, vx, vy: vx === 0 ? spd + 0.4 : spd })
             }
           } else {
-            s.alienBullets.push({ x: bx, y: by, vx: 0,    vy: ALIEN_BULLET_SPD + 1.5 })
-            s.alienBullets.push({ x: bx, y: by, vx: -2.8, vy: ALIEN_BULLET_SPD })
-            s.alienBullets.push({ x: bx, y: by, vx:  2.8, vy: ALIEN_BULLET_SPD })
+            // 3방향 — 속도 낮춤
+            s.alienBullets.push({ x: bx, y: by, vx: 0,    vy: ALIEN_BULLET_SPD + 0.8 })
+            s.alienBullets.push({ x: bx, y: by, vx: -2.2, vy: ALIEN_BULLET_SPD - 0.3 })
+            s.alienBullets.push({ x: bx, y: by, vx:  2.2, vy: ALIEN_BULLET_SPD - 0.3 })
           }
           boss.shootTimer = 0
         }
 
         // 총알 vs 보스
+        let bossDefeated = false
         for (let bi = s.bullets.length - 1; bi >= 0; bi--) {
           const b = s.bullets[bi]
+          if (!b) continue   // 안전 가드
           if (Math.abs(b.x - boss.x) < 72 && Math.abs(b.y - boss.y) < 46) {
             boss.hp -= b.dmg
             s.bullets.splice(bi, 1)
-            if (boss.hp <= 0) {
-              s.score += 100 * s.wave
-              s.explosions.push({ x: boss.x, y: boss.y, frame: 0, max: 45, r: 72, color: '#bb44ff' })
-              spawnItem(s, boss.x, boss.y, 2)
-              s.boss = null
-              s.wave++
-              s.wavePhase = 'transition'
-              s.transitionReady = false
-              // 게임보드 정리
-              s.bullets = []
-              s.alienBullets = []
-              s.items = []
-              s.ufoTimer = 0
-            }
+            if (boss.hp <= 0) { bossDefeated = true; break }  // ← 루프 즉시 탈출
           }
+        }
+        if (bossDefeated) {
+          s.score += 100 * s.wave
+          s.explosions.push({ x: boss.x, y: boss.y, frame: 0, max: 45, r: 72, color: '#bb44ff' })
+          spawnItem(s, boss.x, boss.y, 2)
+          s.boss = null
+          s.wave++
+          s.wavePhase = 'transition'
+          s.transitionReady = false
+          // 게임보드 정리
+          s.bullets = []
+          s.alienBullets = []
+          s.items = []
+          s.ufoTimer = 0
         }
       }
 
