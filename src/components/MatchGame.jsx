@@ -583,7 +583,10 @@ export default function MatchGame({ onBack }) {
                 <div>ㄱ자 / T자 → <b style={{ color: '#ff8c00' }}>폭탄 💣</b></div>
               </div>
               <div style={{ fontSize: 'clamp(11px,2vw,13px)', color: '#777' }}>총 {MAX_MOVES}번 이동 가능</div>
-              <button style={s.btnPrimary} onClick={startGame}>시작!</button>
+              <div style={s.btnGroup}>
+                <button style={s.btnPrimary} onClick={startGame}>시작!</button>
+                <button style={s.btnSecondary} onClick={onBack}>← 게임 선택</button>
+              </div>
             </div>
           </div>
         )}
@@ -599,7 +602,7 @@ export default function MatchGame({ onBack }) {
               {newBest && <div style={s.newBest}>🎉 최고 기록 달성!</div>}
               <div style={s.btnGroup}>
                 <button style={s.btnPrimary} onClick={startGame}>다시 하기</button>
-                <button style={s.btnSecondary} onClick={onBack}>← 나가기</button>
+                <button style={s.btnSecondary} onClick={onBack}>← 게임 선택</button>
               </div>
             </div>
           </div>

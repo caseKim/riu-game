@@ -435,7 +435,7 @@ export default function Game({ character, difficulty, onBack }) {
             {score >= best && <div style={styles.newBest}>🎉 최고 기록!</div>}
             <div style={styles.btnGroup}>
               <button onClick={restart} style={styles.btn}>다시 시작</button>
-              <button onClick={onBack} style={styles.btnSecondary}>← 나가기</button>
+              <button onClick={onBack} style={styles.btnSecondary}>← 게임 선택</button>
             </div>
           </Overlay>
         )}
