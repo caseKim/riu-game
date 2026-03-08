@@ -2,6 +2,15 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Working Rules
+
+- Never ask the user to paste full files
+- Do not rewrite entire files — return minimal patches only
+- Do not reformat unrelated code
+- Avoid long explanations; code first, explanation optional
+- Before reading files, search with Grep/Glob first
+- Read only the necessary file sections, not entire files
+
 ## Commands
 
 ```bash

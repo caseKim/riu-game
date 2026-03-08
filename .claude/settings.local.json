@@ -26,7 +26,8 @@
       "Bash(npm run build 2>&1)",
       "Bash(npm run lint 2>&1 && npm run build 2>&1)",
       "Bash(git add src/components/MatchGame.jsx src/components/SpaceGame.jsx src/components/JumpGame.jsx && git status)",
-      "Bash(git commit -m \"$\\(cat <<'EOF'\n보석맞추기 시작 화면 나가기 버튼 추가 & 버튼 텍스트 통일\n\n- MatchGame 시작 오버레이에 게임 선택 버튼 추가\n- 시작/게임오버 오버레이: ← 게임 선택\n- 인게임 상단 topBar: ← 나가기\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\")"
+      "Bash(git commit -m \"$\\(cat <<'EOF'\n보석맞추기 시작 화면 나가기 버튼 추가 & 버튼 텍스트 통일\n\n- MatchGame 시작 오버레이에 게임 선택 버튼 추가\n- 시작/게임오버 오버레이: ← 게임 선택\n- 인게임 상단 topBar: ← 나가기\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(xxd /Users/ace/Dev/riu-game/.claude/rules.md | head -20)"
     ]
   }
 }
