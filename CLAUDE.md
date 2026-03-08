@@ -33,24 +33,24 @@ No test framework is set up.
 
 ## Architecture
 
-React + Vite single-page app with two games. No routing — screen transitions are handled by conditional rendering in `App.jsx` via `gameId` and `selection` state.
+React + Vite single-page app. No routing — screen transitions are handled by conditional rendering in `App.jsx` via `gameId` state.
 
 ### Screen flow
 
 ```
 App
  ├── GameSelect          (gameId === null)
+ ├── JumpGame            (gameId === 'jump')
  ├── SnakeGame           (gameId === 'snake')
- └── JumpCharacterSelect (gameId === 'jump', selection === null)
-       └── JumpGame      (selection !== null)
-             props: { character, difficulty, onBack }
+ ├── SpaceGame           (gameId === 'space')
+ └── MatchGame           (gameId === 'match')
 ```
 
 ### Adding a new game
 
 1. Add entry to `GAMES` array in `GameSelect.jsx` with `available: true`
-2. Create `src/components/YourGame.jsx`
-3. Handle `gameId === 'your-id'` in `App.jsx`
+2. Create `src/components/YourGame.jsx` — must accept `{ onBack }` prop
+3. Import and add `if (gameId === 'your-id') return <YourGame onBack={...} />` in `App.jsx`
 
 ### State management
 
