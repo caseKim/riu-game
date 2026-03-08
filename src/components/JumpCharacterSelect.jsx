@@ -24,9 +24,9 @@ const CHARACTERS = {
 }
 
 const DIFFICULTIES = [
-  { id: 'easy',   label: '쉬움',   emoji: '🟢', desc: '천천히 시작해요',   color: '#4CAF50', glow: 'rgba(76,175,80,0.35)' },
-  { id: 'normal', label: '보통',   emoji: '🟡', desc: '적당히 도전해요',   color: '#FFD700', glow: 'rgba(255,215,0,0.35)' },
-  { id: 'hard',   label: '어려움', emoji: '🔴', desc: '최고를 노려봐요!', color: '#F44336', glow: 'rgba(244,67,54,0.35)' },
+  { id: 'easy',   label: '쉬움',   emoji: '🌱', desc: '천천히 시작해요',   color: '#4CAF50', glow: 'rgba(76,175,80,0.35)' },
+  { id: 'normal', label: '보통',   emoji: '⚡', desc: '적당히 도전해요',   color: '#FFD700', glow: 'rgba(255,215,0,0.35)' },
+  { id: 'hard',   label: '어려움', emoji: '🔥', desc: '최고를 노려봐요!', color: '#F44336', glow: 'rgba(244,67,54,0.35)' },
 ]
 
 function getBest(diffId) {

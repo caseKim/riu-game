@@ -17,9 +17,9 @@ const H = 500          // TODO: 캔버스 세로
 const GAME_ID = 'template'  // TODO: 게임 고유 ID (localStorage 키에 사용)
 
 const DIFFICULTIES = [
-  { id: 'easy',   label: '쉬움',   emoji: '🟢', color: '#4CAF50' },
-  { id: 'normal', label: '보통',   emoji: '🟡', color: '#FFD700' },
-  { id: 'hard',   label: '어려움', emoji: '🔴', color: '#F44336' },
+  { id: 'easy',   label: '쉬움',   emoji: '🌱', color: '#4CAF50' },
+  { id: 'normal', label: '보통',   emoji: '⚡', color: '#FFD700' },
+  { id: 'hard',   label: '어려움', emoji: '🔥', color: '#F44336' },
 ]
 
 // TODO: 난이도별 수치 조정

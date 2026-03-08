@@ -48,9 +48,9 @@ const BOSS_TYPES = [
 ]
 
 const DIFFICULTIES = [
-  { id: 'easy',   label: '쉬움',   emoji: '🟢', color: '#4CAF50', alienSpd: 0.7,  fireMin: 100, bossHp: 12 },
-  { id: 'normal', label: '보통',   emoji: '🟡', color: '#FFD700', alienSpd: 1.2,  fireMin: 65,  bossHp: 20 },
-  { id: 'hard',   label: '어려움', emoji: '🔴', color: '#F44336', alienSpd: 1.8,  fireMin: 38,  bossHp: 30 },
+  { id: 'easy',   label: '쉬움',   emoji: '🌱', color: '#4CAF50', alienSpd: 0.7,  fireMin: 100, bossHp: 12 },
+  { id: 'normal', label: '보통',   emoji: '⚡', color: '#FFD700', alienSpd: 1.2,  fireMin: 65,  bossHp: 20 },
+  { id: 'hard',   label: '어려움', emoji: '🔥', color: '#F44336', alienSpd: 1.8,  fireMin: 38,  bossHp: 30 },
 ]
 
 // ── 헬퍼 함수 ───────────────────────────────────────────────────────
