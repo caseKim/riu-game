@@ -21,6 +21,13 @@ const GAMES = [
     available: true,
   },
   {
+    id: 'match',
+    emoji: '💎',
+    name: '보석 맞추기',
+    desc: '보석 3개를 맞춰요!',
+    available: true,
+  },
+  {
     id: 'drawing',
     emoji: '🎨',
     name: '그림 그리기',

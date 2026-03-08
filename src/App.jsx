@@ -4,6 +4,7 @@ import JumpCharacterSelect from './components/JumpCharacterSelect'
 import JumpGame from './components/JumpGame'
 import SnakeGame from './components/SnakeGame'
 import SpaceGame from './components/SpaceGame'
+import MatchGame from './components/MatchGame'
 
 export default function App() {
   const [gameId, setGameId] = useState(null)
@@ -19,6 +20,10 @@ export default function App() {
 
   if (gameId === 'space') {
     return <SpaceGame onBack={() => setGameId(null)} />
+  }
+
+  if (gameId === 'match') {
+    return <MatchGame onBack={() => setGameId(null)} />
   }
 
   if (!selection) {
