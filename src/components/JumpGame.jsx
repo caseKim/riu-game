@@ -1,5 +1,52 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 
+const CHARACTERS = {
+  animals: [
+    { id: 'rabbit',  emoji: '🐰', name: '토끼' },
+    { id: 'cat',     emoji: '🐱', name: '고양이' },
+    { id: 'fox',     emoji: '🦊', name: '여우' },
+    { id: 'panda',   emoji: '🐼', name: '판다' },
+    { id: 'tiger',   emoji: '🐯', name: '호랑이' },
+    { id: 'frog',    emoji: '🐸', name: '개구리' },
+    { id: 'bear',    emoji: '🐻', name: '곰' },
+    { id: 'dog',     emoji: '🐶', name: '강아지' },
+  ],
+  heroes: [
+    { id: 'superhero', emoji: '🦸', name: '슈퍼히어로' },
+    { id: 'wizard',    emoji: '🧙', name: '마법사' },
+    { id: 'ninja',     emoji: '🥷', name: '닌자' },
+    { id: 'prince',    emoji: '🤴', name: '왕자' },
+    { id: 'princess',  emoji: '👸', name: '공주' },
+    { id: 'unicorn',   emoji: '🦄', name: '유니콘' },
+    { id: 'dragon',    emoji: '🐉', name: '드래곤' },
+    { id: 'robot',     emoji: '🤖', name: '로봇' },
+  ],
+}
+
+const JUMP_DIFFICULTIES = [
+  { id: 'easy',   label: '쉬움',   emoji: '🟢', desc: '천천히 시작해요',   color: '#4CAF50', glow: 'rgba(76,175,80,0.35)' },
+  { id: 'normal', label: '보통',   emoji: '🟡', desc: '적당히 도전해요',   color: '#FFD700', glow: 'rgba(255,215,0,0.35)' },
+  { id: 'hard',   label: '어려움', emoji: '🔴', desc: '최고를 노려봐요!', color: '#F44336', glow: 'rgba(244,67,54,0.35)' },
+]
+
+function getSavedCharacter() {
+  const id = localStorage.getItem('jump_char')
+  for (const list of Object.values(CHARACTERS)) {
+    const found = list.find(c => c.id === id)
+    if (found) return found
+  }
+  return CHARACTERS.animals[0]
+}
+
+function getSavedDifficulty() {
+  const id = localStorage.getItem('jump_diff')
+  return JUMP_DIFFICULTIES.find(d => d.id === id) ?? JUMP_DIFFICULTIES[1]
+}
+
+function getBest(diffId) {
+  return Number(localStorage.getItem(`best_${diffId}`) || 0)
+}
+
 const W = 1000
 const H = 420
 const GROUND_Y = 350
@@ -24,7 +71,16 @@ const DIFF_SETTINGS = {
   hard:   { baseSpeed: 8, intervalMax: 75,  intervalMin: 28, doubleScore: 15,   doubleChance: 0.45, maxSpeed: 18 },
 }
 
-export default function Game({ character, difficulty, onBack }) {
+export default function Game({ onBack }) {
+  const [character, setCharacter] = useState(getSavedCharacter)
+  const [difficulty, setDifficulty] = useState(getSavedDifficulty)
+  const [tab, setTab] = useState('animals')
+  const [bests, setBests] = useState(() => ({
+    easy:   getBest('easy'),
+    normal: getBest('normal'),
+    hard:   getBest('hard'),
+  }))
+
   const diff = DIFF_SETTINGS[difficulty.id]
   const bestKey = `best_${difficulty.id}`
 
@@ -32,13 +88,13 @@ export default function Game({ character, difficulty, onBack }) {
   const canvasWrapRef = useRef(null)
   const stateRef = useRef(null)
   const gameOverAtRef = useRef(0)
-  if (stateRef.current == null) stateRef.current = makeInitialState()
+  if (stateRef.current == null) stateRef.current = makeInitialState(diff)
   const animRef = useRef(null)
   const [score, setScore] = useState(0)
   const [best, setBest] = useState(() => Number(localStorage.getItem(bestKey) || 0))
   const [phase, setPhase] = useState('idle')
 
-  function makeInitialState() {
+  function makeInitialState(d) {
     return {
       player: { x: 120, y: GROUND_Y - PLAYER_SIZE, vy: 0, onGround: true, jumpCount: 0 },
       obstacles: [],
@@ -59,7 +115,7 @@ export default function Game({ character, difficulty, onBack }) {
       })),
       score: 0,
       frame: 0,
-      speed: diff.baseSpeed,
+      speed: d.baseSpeed,
       items: [],
       itemTimer: 0,
       nextItemInterval: 450 + Math.floor(Math.random() * 250),
@@ -69,8 +125,7 @@ export default function Game({ character, difficulty, onBack }) {
   }
 
   const jump = useCallback(() => {
-    if (phase === 'gameover') return
-    if (phase === 'idle') setPhase('playing')
+    if (phase === 'gameover' || phase === 'idle') return
     const p = stateRef.current.player
     const maxJumps = stateRef.current.active.triple > 0 ? 3 : 2
     if (p.jumpCount < maxJumps) {
@@ -80,16 +135,26 @@ export default function Game({ character, difficulty, onBack }) {
     }
   }, [phase])
 
+  const startGame = useCallback(() => {
+    const d = DIFF_SETTINGS[difficulty.id]
+    stateRef.current = makeInitialState(d)
+    setScore(0)
+    setBest(getBest(difficulty.id))
+    setPhase('playing')
+  }, [difficulty])
+
   const restart = useCallback(() => {
-    stateRef.current = makeInitialState()
+    const d = DIFF_SETTINGS[difficulty.id]
+    stateRef.current = makeInitialState(d)
     setScore(0)
     setPhase('playing')
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [difficulty])
 
   useEffect(() => {
     const onKey = (e) => {
       if (e.code === 'Space' || e.code === 'ArrowUp') {
         e.preventDefault()
+        if (phase === 'idle') return
         if (phase === 'gameover') {
           if (Date.now() - gameOverAtRef.current < 800) return
           restart()
@@ -117,6 +182,7 @@ export default function Game({ character, difficulty, onBack }) {
 
   useEffect(() => {
     const canvas = canvasRef.current
+    if (!canvas) return
     const ctx = canvas.getContext('2d')
 
     const loop = () => {
@@ -383,47 +449,139 @@ export default function Game({ character, difficulty, onBack }) {
     return () => cancelAnimationFrame(animRef.current)
   }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  function pickCharacter(char) {
+    setCharacter(char)
+    localStorage.setItem('jump_char', char.id)
+  }
+
+  function pickDifficulty(d) {
+    setDifficulty(d)
+    localStorage.setItem('jump_diff', d.id)
+    setBest(getBest(d.id))
+  }
+
   return (
     <div style={styles.wrapper}>
-      <div style={styles.topBar}>
-        <button onClick={onBack} style={styles.backBtn}>← 나가기</button>
-      </div>
-      <h1 style={styles.title}>🎮 점프 게임!</h1>
-      <p style={styles.subtitle}>
-        {character.emoji} {character.name} &nbsp;·&nbsp;
-        <span style={{ ...styles.diffBadge, background: difficulty.color }}>{difficulty.emoji} {difficulty.label}</span>
-      </p>
-      <div ref={canvasWrapRef} style={styles.gameArea} onMouseDown={jump}>
-        <div style={styles.canvasWrap}>
-          <canvas
-            ref={canvasRef}
-            width={W}
-            height={H}
-            style={styles.canvas}
-          />
+      {phase !== 'idle' && (
+        <div style={styles.topBar}>
+          <button onClick={() => setPhase('idle')} style={styles.backBtn}>← 나가기</button>
         </div>
-
-        <div style={styles.scoreCard}>
-          <div style={styles.scoreRow}>
-            <div style={styles.scoreItem}>
-              <span style={styles.scoreLabel}>점수</span>
-              <span style={styles.score}>{score}</span>
-            </div>
-            <div style={styles.scoreDivider} />
-            <div style={styles.scoreItem}>
-              <span style={styles.scoreLabel}>🏆 최고</span>
-              <span style={styles.best}>{best}</span>
-            </div>
+      )}
+      {phase !== 'idle' && (
+        <>
+          <h1 style={styles.title}>🎮 점프 게임!</h1>
+          <p style={styles.subtitle}>
+            {character.emoji} {character.name} &nbsp;·&nbsp;
+            <span style={{ ...styles.diffBadge, background: difficulty.color }}>{difficulty.emoji} {difficulty.label}</span>
+          </p>
+        </>
+      )}
+      <div ref={canvasWrapRef} style={styles.gameArea} onMouseDown={phase !== 'idle' ? jump : undefined}>
+        {phase !== 'idle' && (
+          <div style={styles.canvasWrap}>
+            <canvas
+              ref={canvasRef}
+              width={W}
+              height={H}
+              style={styles.canvas}
+            />
           </div>
-          <div style={styles.hint}>스페이스바 / 탭으로 점프 &nbsp;·&nbsp; 두 번 누르면 2단 점프 ✨ &nbsp;·&nbsp; 🍎 과일 +10점!</div>
-        </div>
+        )}
+
+        {phase !== 'idle' && (
+          <div style={styles.scoreCard}>
+            <div style={styles.scoreRow}>
+              <div style={styles.scoreItem}>
+                <span style={styles.scoreLabel}>점수</span>
+                <span style={styles.score}>{score}</span>
+              </div>
+              <div style={styles.scoreDivider} />
+              <div style={styles.scoreItem}>
+                <span style={styles.scoreLabel}>🏆 최고</span>
+                <span style={styles.best}>{best}</span>
+              </div>
+            </div>
+            <div style={styles.hint}>스페이스바 / 탭으로 점프 &nbsp;·&nbsp; 두 번 누르면 2단 점프 ✨ &nbsp;·&nbsp; 🍎 과일 +10점!</div>
+          </div>
+        )}
 
         {phase === 'idle' && (
-          <Overlay>
-            <div style={styles.oEmoji}>{character.emoji}</div>
-            <div style={styles.oTitle}>{character.name} 출동!</div>
-            <div style={styles.oHint}>스페이스바 또는 화면을 클릭해서 시작!</div>
-          </Overlay>
+          <div style={styles.overlay}>
+            <div style={{ ...styles.overlayBox, maxWidth: 560 }}>
+              <h1 style={styles.title}>🏃 점프 게임!</h1>
+
+              <p style={styles.sectionLabel}>캐릭터를 골라봐요!</p>
+              <div style={styles.tabs}>
+                <button
+                  style={{ ...styles.tab, ...(tab === 'animals' ? styles.tabActive : {}) }}
+                  onClick={() => setTab('animals')}
+                >🐾 동물</button>
+                <button
+                  style={{ ...styles.tab, ...(tab === 'heroes' ? styles.tabActive : {}) }}
+                  onClick={() => setTab('heroes')}
+                >⚔️ 영웅</button>
+              </div>
+              <div style={styles.charGrid}>
+                {CHARACTERS[tab].map((char) => {
+                  const sel = character.id === char.id
+                  return (
+                    <button
+                      key={char.id}
+                      style={{ ...styles.charCard, ...(sel ? styles.charCardSelected : {}) }}
+                      onClick={() => pickCharacter(char)}
+                    >
+                      <span style={styles.charEmoji}>{char.emoji}</span>
+                      <span style={styles.charName}>{char.name}</span>
+                      {sel && <span style={styles.check}>✓</span>}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <p style={styles.sectionLabel}>난이도를 골라봐요!</p>
+              <div style={styles.diffRow}>
+                {JUMP_DIFFICULTIES.map((d) => {
+                  const sel = difficulty.id === d.id
+                  return (
+                    <button
+                      key={d.id}
+                      style={{
+                        ...styles.diffCard,
+                        ...(sel ? {
+                          border: `2px solid ${d.color}`,
+                          background: '#1e1e2e',
+                          boxShadow: `0 0 16px ${d.glow}`,
+                          transform: 'scale(1.06)',
+                        } : {}),
+                      }}
+                      onClick={() => pickDifficulty(d)}
+                    >
+                      <span style={styles.diffEmoji}>{d.emoji}</span>
+                      <span style={{ ...styles.diffLabel, color: sel ? d.color : '#ccc' }}>{d.label}</span>
+                      <span style={styles.diffDesc}>{d.desc}</span>
+                      <span style={{ ...styles.diffBest, color: bests[d.id] > 0 ? d.color : '#555' }}>
+                        🏆 {bests[d.id] > 0 ? bests[d.id] : '-'}
+                      </span>
+                      {sel && <span style={{ ...styles.check, color: d.color }}>✓</span>}
+                    </button>
+                  )
+                })}
+              </div>
+
+              <div style={{ ...styles.preview, borderColor: difficulty.color }}>
+                <span style={styles.previewEmoji}>{character.emoji}</span>
+                <div>
+                  <div style={{ ...styles.previewName, color: difficulty.color }}>{character.name}</div>
+                  <div style={styles.previewDiff}>{difficulty.emoji} {difficulty.label} 모드</div>
+                </div>
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%' }}>
+                <button style={styles.startBtn} onClick={startGame}>게임 시작! 🚀</button>
+                <button style={styles.btnSecondary} onClick={onBack}>← 게임 선택</button>
+              </div>
+            </div>
+          </div>
         )}
 
         {phase === 'gameover' && (
@@ -435,6 +593,7 @@ export default function Game({ character, difficulty, onBack }) {
             {score >= best && <div style={styles.newBest}>🎉 최고 기록!</div>}
             <div style={styles.btnGroup}>
               <button onClick={restart} style={styles.btn}>다시 시작</button>
+              <button onClick={() => { setBests({ easy: getBest('easy'), normal: getBest('normal'), hard: getBest('hard') }); setPhase('idle') }} style={styles.btnSecondary}>캐릭터 변경</button>
               <button onClick={onBack} style={styles.btnSecondary}>← 게임 선택</button>
             </div>
           </Overlay>
@@ -959,6 +1118,121 @@ const styles = {
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  sectionLabel: {
+    fontSize: 'clamp(13px, 3vw, 16px)',
+    color: '#aaa',
+    margin: '0 0 8px',
+    alignSelf: 'flex-start',
+  },
+  tabs: {
+    display: 'flex',
+    gap: 10,
+    marginBottom: 12,
+    alignSelf: 'flex-start',
+  },
+  tab: {
+    padding: 'clamp(5px, 1.2vw, 7px) clamp(12px, 3vw, 20px)',
+    fontSize: 'clamp(12px, 2.5vw, 14px)',
+    fontWeight: 'bold',
+    borderRadius: 30,
+    border: '2px solid #444',
+    background: 'transparent',
+    color: '#aaa',
+    cursor: 'pointer',
+  },
+  tabActive: {
+    background: '#FFD700',
+    borderColor: '#FFD700',
+    color: '#222',
+  },
+  charGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+    gap: 'clamp(5px, 1.5vw, 10px)',
+    marginBottom: 16,
+    width: '100%',
+  },
+  charCard: {
+    position: 'relative',
+    padding: 'clamp(7px, 1.5vw, 12px) 4px',
+    background: '#151525',
+    border: '2px solid #333',
+    borderRadius: 12,
+    cursor: 'pointer',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 3,
+    transition: 'all 0.15s',
+  },
+  charCardSelected: {
+    border: '2px solid #FFD700',
+    background: '#2a2a1a',
+    transform: 'scale(1.06)',
+    boxShadow: '0 0 14px rgba(255,215,0,0.35)',
+  },
+  charEmoji: { fontSize: 'clamp(22px, 5vw, 34px)', lineHeight: 1 },
+  charName: { fontSize: 'clamp(9px, 1.8vw, 12px)', color: '#ccc', fontWeight: 'bold' },
+  check: {
+    position: 'absolute',
+    top: 3,
+    right: 5,
+    fontSize: 10,
+    color: '#FFD700',
+    fontWeight: 'bold',
+  },
+  diffRow: {
+    display: 'flex',
+    gap: 'clamp(7px, 2vw, 12px)',
+    marginBottom: 14,
+    width: '100%',
+  },
+  diffCard: {
+    position: 'relative',
+    flex: 1,
+    padding: 'clamp(8px, 1.5vw, 12px) clamp(6px, 1.5vw, 10px)',
+    background: '#151525',
+    border: '2px solid #333',
+    borderRadius: 12,
+    cursor: 'pointer',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 3,
+    transition: 'all 0.15s',
+  },
+  diffEmoji: { fontSize: 'clamp(18px, 4vw, 26px)' },
+  diffLabel: { fontSize: 'clamp(12px, 2.5vw, 15px)', fontWeight: 'bold' },
+  diffDesc: { fontSize: 'clamp(9px, 1.6vw, 11px)', color: '#777', textAlign: 'center' },
+  diffBest: { fontSize: 'clamp(10px, 1.8vw, 12px)', fontWeight: 'bold', marginTop: 1 },
+  preview: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 12,
+    background: '#151525',
+    border: '2px solid #FFD700',
+    borderRadius: 14,
+    padding: 'clamp(8px, 1.5vw, 12px) clamp(14px, 3vw, 22px)',
+    marginBottom: 14,
+    transition: 'border-color 0.2s',
+    width: '100%',
+    boxSizing: 'border-box',
+  },
+  previewEmoji: { fontSize: 'clamp(28px, 6vw, 40px)' },
+  previewName: { fontSize: 'clamp(14px, 3vw, 18px)', fontWeight: 'bold' },
+  previewDiff: { fontSize: 'clamp(11px, 2vw, 13px)', color: '#aaa', marginTop: 2 },
+  startBtn: {
+    padding: 'clamp(10px, 2vw, 14px) clamp(20px, 5vw, 36px)',
+    fontSize: 'clamp(16px, 3.5vw, 21px)',
+    fontWeight: 'bold',
+    borderRadius: 14,
+    border: 'none',
+    background: 'linear-gradient(135deg, #FFD700, #FFA500)',
+    color: '#222',
+    cursor: 'pointer',
+    boxShadow: '0 4px 20px rgba(255,165,0,0.4)',
+    width: '100%',
   },
   topBar: {
     width: '100%',
