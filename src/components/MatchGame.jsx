@@ -136,15 +136,17 @@ function activateSpecialSwap(g, posA, posB) {
   if (a?.kind === 'rainbow' || b?.kind === 'rainbow') {
     const rainbowPos = a?.kind === 'rainbow' ? posA : posB
     const partnerPos = rainbowPos === posA ? posB : posA
-    const partner = newG[partnerPos]
+    const partner = newG[partnerPos]  // snapshot before any nulling
     newG[rainbowPos] = null
     if (partner?.kind === 'rainbow') {
       for (let i = 0; i < newG.length; i++) newG[i] = null
     } else {
       const targetColor = partner?.color ?? 0
+      // Clear same-color cells — skip partnerPos so it stays readable for activation below
       for (let i = 0; i < newG.length; i++) {
-        if (newG[i]?.color === targetColor) newG[i] = null
+        if (i !== partnerPos && newG[i]?.color === targetColor) newG[i] = null
       }
+      // Activate partner AFTER the sweep (it's still in newG because we skipped it above)
       if (partner?.kind !== 'normal') newG = activateAt(newG, partnerPos)
       else newG[partnerPos] = null
     }
