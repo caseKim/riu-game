@@ -19,7 +19,14 @@
       "Bash(git commit -m \"$\\(cat <<'EOF'\nUX 통일 & 파일명 컨벤션 정리\n\n파일명:\n- Game.jsx → JumpGame.jsx\n- CharacterSelect.jsx → JumpCharacterSelect.jsx\n\n버튼 텍스트 통일:\n- 점프 게임 화면 내: '← 돌아가기' → '← 나가기'\n- 뱀 게임 오버레이: '← 돌아가기' → '← 게임 선택'\n\n게임 오버 화면 통일 \\(두 게임 장점 합산\\):\n- 이모지\\(🏆/😵\\) + 금색 '신기록!'/'게임 오버!' 타이틀\n- bigScore 큰 숫자 + bestScore 작은 텍스트 + '🎉 최고 기록!' 배지\n- 점프: 세로 버튼 배열, overlayBox 카드 구조\n- 뱀: 기존 diff/color picker 유지, 구조 통일\n\n배경색/버튼 스타일 통일\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
       "Bash(npm run lint 2>&1 && npm run build 2>&1 | tail -6)",
       "Bash(npm run lint 2>&1 && npm run build 2>&1 | tail -5)",
-      "Bash(npm run lint 2>&1 && npm run build 2>&1 | tail -8)"
+      "Bash(npm run lint 2>&1 && npm run build 2>&1 | tail -8)",
+      "Bash(git add src/components/MatchGame.jsx src/components/GameSelect.jsx src/App.jsx && git status)",
+      "Bash(git commit -m \"$\\(cat <<'EOF'\n보석 맞추기 게임 추가 — 3매치 퍼즐 with 아이템 & 애니메이션\n\n- 8×8 그리드, 6가지 보석, 30회 이동 제한\n- 4개 매치 → 줄 폭탄, 5개 매치 → 무지개, ㄱ/T자 → 폭탄\n- 특수 아이템끼리 교환 시 연쇄 폭발\n- 제거 애니메이션: gemPop / lineBlast / bombBurst / rainbowPop\n- 새 보석 낙하 dropIn 애니메이션, 스왑 슬라이드 애니메이션\n- UX 통일: 타이틀·버튼·점수카드·오버레이 스타일 다른 게임과 동일\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\")",
+      "Bash(npm run lint 2>&1 && echo \"OK\")",
+      "Bash(npm run build 2>&1)",
+      "Bash(npm run lint 2>&1 && npm run build 2>&1)",
+      "Bash(git add src/components/MatchGame.jsx src/components/SpaceGame.jsx src/components/JumpGame.jsx && git status)",
+      "Bash(git commit -m \"$\\(cat <<'EOF'\n보석맞추기 시작 화면 나가기 버튼 추가 & 버튼 텍스트 통일\n\n- MatchGame 시작 오버레이에 게임 선택 버튼 추가\n- 시작/게임오버 오버레이: ← 게임 선택\n- 인게임 상단 topBar: ← 나가기\n\nCo-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }
