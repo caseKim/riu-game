@@ -2,27 +2,41 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 
 // ── 상수 ────────────────────────────────────────────────────────────
 const W = 900
-const H = 540
+const H = 620
 const PLAYER_Y = H - 72
 const PS = 22           // 플레이어 충돌 반경
-const BULLET_SPD = 12
+const BULLET_SPD = 13
 const ALIEN_BULLET_SPD = 4.5
 const FIRE_INTERVAL = 18
-const ALIEN_COLS = 8
-const ALIEN_ROWS = 3
-const ALIEN_GAP_X = 88
-const ALIEN_GAP_Y = 62
-const ALIEN_W = 40      // 충돌 박스 너비
-const ALIEN_H = 32      // 충돌 박스 높이
-const ALIEN_START_X = 142  // 포메이션 좌우 대칭 시작 X
-const ALIEN_START_Y = 55
+const ALIEN_GAP_X = 82
+const ALIEN_GAP_Y = 60
+const ALIEN_W = 40
+const ALIEN_H = 32
+const ALIEN_START_Y = 52
 const ALIEN_STEP_DOWN = 24
+const ITEM_SPEED = 1.8
+const ITEM_RADIUS = 22
+const ITEM_DROP_CHANCE = 0.18
+const UFO_Y = 28
+const UFO_SPD = 2.8
 
 const ALIEN_CFG = [
   { emoji: '👾', hp: 2, pts: 30, color: '#ff88ff' },
   { emoji: '👽', hp: 1, pts: 20, color: '#88ff88' },
   { emoji: '🐛', hp: 1, pts: 10, color: '#ffcc44' },
+  { emoji: '🤖', hp: 2, pts: 25, color: '#88ccff' },
 ]
+
+const ITEM_TYPES = [
+  { id: 'power',  emoji: '⚡', label: '강력탄', color: '#ffdd00', duration: 480 },
+  { id: 'spread', emoji: '🔱', label: '확산탄', color: '#00ffcc', duration: 600 },
+  { id: 'rapid',  emoji: '🔥', label: '속사',   color: '#ff6622', duration: 480 },
+  { id: 'shield', emoji: '🛡️', label: '방어막', color: '#4488ff', duration: 360 },
+  { id: 'life',   emoji: '❤️', label: '+목숨',  color: '#ff4488', duration: 0 },
+  { id: 'bomb',   emoji: '💣', label: '폭탄',   color: '#ff8800', duration: 0 },
+]
+
+const WAVE_SUBTITLES = ['', '다이버 등장!', '포메이션 강화!', '5방향 보스!', '조준 사격!', '사인파 돌격!', '최후의 결전!']
 
 const DIFFICULTIES = [
   { id: 'easy',   label: '쉬움',   emoji: '🟢', color: '#4CAF50', alienSpd: 0.7,  fireMin: 100, bossHp: 12 },
@@ -31,16 +45,31 @@ const DIFFICULTIES = [
 ]
 
 // ── 헬퍼 함수 ───────────────────────────────────────────────────────
-function makeAliens() {
+function getWaveCfg(wave) {
+  return {
+    cols: Math.min(8 + Math.floor((wave - 1) / 2), 11),
+    rows: Math.min(3 + Math.floor((wave - 1) / 2), 5),
+    hasDivers:   wave >= 2,
+    hasUfo:      wave >= 2,
+    hasAimed:    wave >= 4,   // 조준 사격 (플레이어 방향으로 쏨)
+    hasSineMove: wave >= 5,   // 사인파 상하 진동
+  }
+}
+
+function makeAliens(wave = 1) {
+  const { cols, rows } = getWaveCfg(wave)
+  const startX = W / 2 - (cols - 1) * ALIEN_GAP_X / 2
   const aliens = []
-  for (let row = 0; row < ALIEN_ROWS; row++) {
-    for (let col = 0; col < ALIEN_COLS; col++) {
+  for (let row = 0; row < rows; row++) {
+    const cfgIdx = Math.min(row, ALIEN_CFG.length - 1)
+    for (let col = 0; col < cols; col++) {
       aliens.push({
-        x: ALIEN_START_X + col * ALIEN_GAP_X,
+        x: startX + col * ALIEN_GAP_X,
         y: ALIEN_START_Y + row * ALIEN_GAP_Y,
-        row, col,
-        hp: ALIEN_CFG[row].hp,
+        cfgIdx, col,
+        hp: ALIEN_CFG[cfgIdx].hp,
         frame: Math.floor(Math.random() * 40),
+        isDiver: false, dvx: 0, dvy: 0,
       })
     }
   }
@@ -54,16 +83,50 @@ function makeBoss(wave, diff) {
     vx: 1.4 + wave * 0.25,
     hp, maxHp: hp,
     frame: 0, shootTimer: 0,
-    nextShoot: Math.max(28, 55 - wave * 4),
+    nextShoot: Math.max(24, 55 - wave * 4),
   }
+}
+
+function spawnItem(s, x, y, count = 1) {
+  for (let i = 0; i < count; i++) {
+    const type = ITEM_TYPES[Math.floor(Math.random() * ITEM_TYPES.length)]
+    s.items.push({ type, x: x + (i - (count - 1) / 2) * 32, y, frame: 0 })
+  }
+}
+
+function applyItem(s, item) {
+  const { type } = item
+  if (type.duration > 0) {
+    s.powerups[type.id] = type.duration
+  } else if (type.id === 'life') {
+    s.lives = Math.min(s.lives + 1, 7)
+  } else if (type.id === 'bomb') {
+    for (const a of s.aliens) {
+      s.score += ALIEN_CFG[a.cfgIdx].pts
+      s.explosions.push({ x: a.x, y: a.y, frame: 0, max: 22, r: 24, color: ALIEN_CFG[a.cfgIdx].color })
+    }
+    s.aliens = []
+    s.alienBullets = []
+    s.explosions.push({ x: W / 2, y: H / 2, frame: 0, max: 44, r: 300, color: '#ff8800' })
+    if (s.boss) {
+      s.boss.hp = Math.ceil(s.boss.hp / 2)
+      s.explosions.push({ x: s.boss.x, y: s.boss.y, frame: 0, max: 30, r: 70, color: '#ff8800' })
+    }
+  }
+  s.popups.push({ text: type.label, x: s.player.x, y: PLAYER_Y - 44, frame: 0, color: type.color })
 }
 
 function makeInitialState(diff) {
   return {
     player: { x: W / 2, invincible: 0 },
+    powerups: {},
     bullets: [],
     alienBullets: [],
-    aliens: makeAliens(),
+    aliens: makeAliens(1),
+    items: [],
+    popups: [],
+    ufo: null,
+    ufoTimer: 0,
     boss: null,
     explosions: [],
     stars: Array.from({ length: 80 }, () => ({
@@ -76,11 +139,15 @@ function makeInitialState(diff) {
     frame: 0,
     bulletTimer: 0,
     alienDx: diff.alienSpd,
+    alienTotal: getWaveCfg(1).cols * getWaveCfg(1).rows,
     alienShootTimer: 0,
     nextAlienShoot: diff.fireMin + Math.floor(Math.random() * 40),
+    alienDiveTimer: 0,
+    nextDiveInterval: 180,
     lives: 3,
     wave: 1,
-    wavePhase: 'wave',  // 'wave' | 'boss'
+    wavePhase: 'wave',
+    waveAnnounce: 90,
     ended: false,
   }
 }
@@ -98,11 +165,11 @@ export default function SpaceGame({ onBack }) {
     const saved = localStorage.getItem('space_diff')
     return DIFFICULTIES.find(d => d.id === saved) ?? DIFFICULTIES[1]
   })
-  const [phase, setPhase]   = useState('idle')
-  const [score, setScore]   = useState(0)
-  const [lives, setLives]   = useState(3)
-  const [wave, setWave]     = useState(1)
-  const [best, setBest]     = useState(() => {
+  const [phase, setPhase] = useState('idle')
+  const [score, setScore] = useState(0)
+  const [lives, setLives] = useState(3)
+  const [wave, setWave]   = useState(1)
+  const [best, setBest]   = useState(() => {
     const id = localStorage.getItem('space_diff') || 'normal'
     return Number(localStorage.getItem(`space_best_${id}`) || 0)
   })
@@ -124,6 +191,9 @@ export default function SpaceGame({ onBack }) {
     const dn = (e) => {
       if (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') keysRef.current.left  = true
       if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keysRef.current.right = true
+      if ((e.key === ' ' || e.key === 'Enter') && stateRef.current?.wavePhase === 'transition') {
+        stateRef.current.transitionReady = true
+      }
     }
     const up = (e) => {
       if (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') keysRef.current.left  = false
@@ -143,19 +213,27 @@ export default function SpaceGame({ onBack }) {
       const rect = wrap.getBoundingClientRect()
       return (clientX - rect.left) * (W / rect.width)
     }
-    const onTouchStart = (e) => { if (e.target.closest('button')) return; e.preventDefault(); pointerXRef.current = toX(e.touches[0].clientX) }
+    const onTouchStart = (e) => {
+      if (e.target.closest('button')) return
+      e.preventDefault()
+      if (stateRef.current?.wavePhase === 'transition') { stateRef.current.transitionReady = true; return }
+      pointerXRef.current = toX(e.touches[0].clientX)
+    }
     const onTouchMove  = (e) => { e.preventDefault(); pointerXRef.current = toX(e.touches[0].clientX) }
     const onTouchEnd   = () => { pointerXRef.current = null }
     const onMouseMove  = (e) => { pointerXRef.current = toX(e.clientX) }
+    const onClick      = ()  => { if (stateRef.current?.wavePhase === 'transition') stateRef.current.transitionReady = true }
     wrap.addEventListener('touchstart', onTouchStart, { passive: false })
     wrap.addEventListener('touchmove',  onTouchMove,  { passive: false })
     wrap.addEventListener('touchend',   onTouchEnd)
     wrap.addEventListener('mousemove',  onMouseMove)
+    wrap.addEventListener('click',      onClick)
     return () => {
       wrap.removeEventListener('touchstart', onTouchStart)
       wrap.removeEventListener('touchmove',  onTouchMove)
       wrap.removeEventListener('touchend',   onTouchEnd)
       wrap.removeEventListener('mousemove',  onMouseMove)
+      wrap.removeEventListener('click',      onClick)
     }
   }, [phase])
 
@@ -182,6 +260,18 @@ export default function SpaceGame({ onBack }) {
       if (s.ended) return
       s.frame++
 
+      // 파워업 감소
+      for (const key of Object.keys(s.powerups)) {
+        s.powerups[key]--
+        if (s.powerups[key] <= 0) delete s.powerups[key]
+      }
+
+      // 파워업 값 계산
+      const dmg         = s.powerups.power  ? 2 : 1
+      const fireRate     = s.powerups.rapid  ? Math.ceil(FIRE_INTERVAL / 2.2) : FIRE_INTERVAL
+      const hasSpread    = !!s.powerups.spread
+      const hasShield    = !!s.powerups.shield
+
       // 별 이동
       for (const star of s.stars) {
         star.y += star.spd
@@ -197,37 +287,136 @@ export default function SpaceGame({ onBack }) {
 
       // 자동 발사
       s.bulletTimer++
-      if (s.bulletTimer >= FIRE_INTERVAL) {
-        s.bullets.push({ x: s.player.x, y: PLAYER_Y - 30 })
+      if (s.bulletTimer >= fireRate) {
+        const px = s.player.x, py = PLAYER_Y - 30
+        if (hasSpread) {
+          s.bullets.push({ x: px, y: py, vx: -4, vy: -BULLET_SPD, dmg })
+          s.bullets.push({ x: px, y: py, vx:  0, vy: -BULLET_SPD, dmg })
+          s.bullets.push({ x: px, y: py, vx:  4, vy: -BULLET_SPD, dmg })
+        } else {
+          s.bullets.push({ x: px, y: py, vx: 0, vy: -BULLET_SPD, dmg })
+        }
         s.bulletTimer = 0
       }
 
-      // 플레이어 총알 이동
-      s.bullets = s.bullets.filter(b => { b.y -= BULLET_SPD; return b.y > -10 })
+      // 총알 이동
+      s.bullets = s.bullets.filter(b => {
+        b.x += b.vx; b.y += b.vy
+        return b.y > -10 && b.x > -20 && b.x < W + 20
+      })
+
+      // UFO (wave 2+)
+      const wcfg = getWaveCfg(s.wave)
+      if (wcfg.hasUfo && s.wavePhase === 'wave') {
+        s.ufoTimer++
+        if (!s.ufo && s.ufoTimer >= 500) {
+          const fromLeft = Math.random() < 0.5
+          s.ufo = { x: fromLeft ? -65 : W + 65, y: UFO_Y, vx: fromLeft ? UFO_SPD + s.wave * 0.15 : -(UFO_SPD + s.wave * 0.15), frame: 0 }
+          s.ufoTimer = 0
+        }
+        if (s.ufo) {
+          s.ufo.x += s.ufo.vx
+          s.ufo.frame++
+          if (s.ufo.x < -80 || s.ufo.x > W + 80) {
+            s.ufo = null
+          } else {
+            for (let bi = s.bullets.length - 1; bi >= 0; bi--) {
+              const b = s.bullets[bi]
+              if (Math.abs(b.x - s.ufo.x) < 36 && Math.abs(b.y - s.ufo.y) < 18) {
+                s.score += 200
+                spawnItem(s, s.ufo.x, s.ufo.y, 1)
+                s.explosions.push({ x: s.ufo.x, y: s.ufo.y, frame: 0, max: 26, r: 34, color: '#ff44ff' })
+                s.ufo = null
+                s.bullets.splice(bi, 1)
+                break
+              }
+            }
+          }
+        }
+      }
 
       // ── 웨이브 페이즈 ─────────────────────────────────────────────
       if (s.wavePhase === 'wave') {
-        // 외계인 이동
         if (s.aliens.length > 0) {
-          const speedMul = 1 + (ALIEN_COLS * ALIEN_ROWS - s.aliens.length) * 0.04
+          const speedMul = 1 + (s.alienTotal - s.aliens.length) * 0.035
           const spd = s.alienDx * speedMul
+          const formAliens = s.aliens.filter(a => !a.isDiver)
           let minX = Infinity, maxX = -Infinity
-          for (const a of s.aliens) { if (a.x < minX) minX = a.x; if (a.x > maxX) maxX = a.x }
-          const hitWall = (spd > 0 && maxX + ALIEN_W / 2 + spd > W - 8) ||
-                          (spd < 0 && minX - ALIEN_W / 2 + spd < 8)
-          if (hitWall) {
-            s.alienDx *= -1
-            for (const a of s.aliens) a.y += ALIEN_STEP_DOWN
-          } else {
-            for (const a of s.aliens) { a.x += spd; a.frame++ }
+          for (const a of formAliens) { if (a.x < minX) minX = a.x; if (a.x > maxX) maxX = a.x }
+          if (formAliens.length > 0) {
+            const hitWall = (spd > 0 && maxX + ALIEN_W / 2 + spd > W - 8) ||
+                            (spd < 0 && minX - ALIEN_W / 2 + spd < 8)
+            if (hitWall) {
+              s.alienDx *= -1
+              for (const a of formAliens) a.y += ALIEN_STEP_DOWN
+            } else {
+              for (const a of formAliens) { a.x += spd; a.frame++ }
+            }
           }
+
+          // 다이버 (wave 2+)
+          if (wcfg.hasDivers && formAliens.length > 2) {
+            s.alienDiveTimer++
+            if (s.alienDiveTimer >= s.nextDiveInterval) {
+              s.alienDiveTimer = 0
+              s.nextDiveInterval = Math.max(70, 200 - s.wave * 15)
+              const idx = Math.floor(Math.random() * formAliens.length)
+              const diver = formAliens[idx]
+              diver.isDiver = true
+              const angle = Math.atan2(PLAYER_Y - diver.y, s.player.x - diver.x)
+              const dspd = 3.5 + s.wave * 0.25
+              diver.dvx = Math.cos(angle) * dspd
+              diver.dvy = Math.abs(Math.sin(angle)) * dspd + 1.5
+            }
+          }
+
+          // 다이버 이동
+          for (const a of s.aliens) {
+            if (!a.isDiver) continue
+            a.x += a.dvx; a.y += a.dvy; a.frame++
+          }
+
+          // 다이버 충돌/제거
+          s.aliens = s.aliens.filter(a => {
+            if (!a.isDiver) return true
+            if (a.y > H + 20 || a.x < -50 || a.x > W + 50) return false
+            if (!s.ended && s.player.invincible === 0 &&
+                Math.abs(a.x - s.player.x) < PS + 18 && Math.abs(a.y - PLAYER_Y) < PS + 18) {
+              if (hasShield) {
+                delete s.powerups.shield
+              } else {
+                s.player.invincible = 110; s.lives--
+                s.explosions.push({ x: s.player.x, y: PLAYER_Y, frame: 0, max: 16, r: 18, color: '#44ccff' })
+                if (s.lives <= 0) endGame(s.score)
+              }
+              return false
+            }
+            return true
+          })
+          if (s.ended) return
+        }
+
+        // 사인파 진동 (wave 5+) — 포메이션 전체에 상하 진동 추가
+        if (wcfg.hasSineMove) {
+          const sineOff = Math.sin(s.frame * 0.04) * 0.8
+          for (const a of s.aliens) { if (!a.isDiver) a.y += sineOff }
         }
 
         // 외계인 사격
         s.alienShootTimer++
         if (s.alienShootTimer >= s.nextAlienShoot && s.aliens.length > 0) {
-          const shooter = s.aliens[Math.floor(Math.random() * s.aliens.length)]
-          s.alienBullets.push({ x: shooter.x, y: shooter.y + ALIEN_H / 2, vx: 0, vy: ALIEN_BULLET_SPD })
+          const nonDivers = s.aliens.filter(a => !a.isDiver)
+          if (nonDivers.length > 0) {
+            const shooter = nonDivers[Math.floor(Math.random() * nonDivers.length)]
+            const sx = shooter.x, sy = shooter.y + ALIEN_H / 2
+            if (wcfg.hasAimed) {
+              // 조준 사격: 플레이어 방향으로 날아오는 총알
+              const angle = Math.atan2(PLAYER_Y - sy, s.player.x - sx)
+              s.alienBullets.push({ x: sx, y: sy, vx: Math.cos(angle) * ALIEN_BULLET_SPD, vy: Math.sin(angle) * ALIEN_BULLET_SPD })
+            } else {
+              s.alienBullets.push({ x: sx, y: sy, vx: 0, vy: ALIEN_BULLET_SPD })
+            }
+          }
           s.alienShootTimer = 0
           s.nextAlienShoot = diff.fireMin + Math.floor(Math.random() * 50)
         }
@@ -239,10 +428,11 @@ export default function SpaceGame({ onBack }) {
           for (let ai = s.aliens.length - 1; ai >= 0; ai--) {
             const a = s.aliens[ai]
             if (Math.abs(b.x - a.x) < ALIEN_W / 2 + 4 && Math.abs(b.y - a.y) < ALIEN_H / 2 + 4) {
-              a.hp--; hit = true
+              a.hp -= b.dmg; hit = true
               if (a.hp <= 0) {
-                s.score += ALIEN_CFG[a.row].pts
-                s.explosions.push({ x: a.x, y: a.y, frame: 0, max: 18, r: 22, color: ALIEN_CFG[a.row].color })
+                s.score += ALIEN_CFG[a.cfgIdx].pts
+                s.explosions.push({ x: a.x, y: a.y, frame: 0, max: 18, r: 22, color: ALIEN_CFG[a.cfgIdx].color })
+                if (Math.random() < ITEM_DROP_CHANCE) spawnItem(s, a.x, a.y, 1)
                 s.aliens.splice(ai, 1)
               }
               break
@@ -251,31 +441,42 @@ export default function SpaceGame({ onBack }) {
           if (hit) s.bullets.splice(bi, 1)
         }
 
-        // 전멸 → 보스 등장
+        // 전멸 → 보스
         if (s.aliens.length === 0) {
           s.boss = makeBoss(s.wave, diff)
           s.wavePhase = 'boss'
+          s.ufo = null
         }
 
-        // 외계인이 플레이어 높이까지 내려오면 게임 오버
+        // 외계인이 바닥까지 → 게임 오버
         for (const a of s.aliens) {
-          if (a.y + ALIEN_H / 2 > PLAYER_Y - 10) { endGame(s.score); return }
+          if (!a.isDiver && a.y + ALIEN_H / 2 > PLAYER_Y - 10) { endGame(s.score); return }
         }
 
       // ── 보스 페이즈 ───────────────────────────────────────────────
       } else if (s.boss) {
         const boss = s.boss
-        boss.x += boss.vx
+        const bossRage = boss.hp / boss.maxHp < 0.3   // 분노 모드: HP 30% 이하
+        const bossSpd = bossRage ? Math.abs(boss.vx) * 1.6 : Math.abs(boss.vx)
+        boss.x += boss.vx > 0 ? bossSpd : -bossSpd
         boss.frame++
         if (boss.x > W - 80 || boss.x < 80) boss.vx *= -1
 
-        // 보스 사격 (3방향 부채꼴)
         boss.shootTimer++
-        if (boss.shootTimer >= boss.nextShoot) {
+        const shootInterval = bossRage ? Math.ceil(boss.nextShoot * 0.6) : boss.nextShoot
+        if (boss.shootTimer >= shootInterval) {
           const bx = boss.x, by = boss.y + 52
-          s.alienBullets.push({ x: bx, y: by, vx: 0,    vy: ALIEN_BULLET_SPD + 1.5 })
-          s.alienBullets.push({ x: bx, y: by, vx: -2.8, vy: ALIEN_BULLET_SPD })
-          s.alienBullets.push({ x: bx, y: by, vx:  2.8, vy: ALIEN_BULLET_SPD })
+          if (s.wave >= 3 || bossRage) {
+            // 5방향 부채꼴 (wave 3+ 또는 분노 시)
+            const spd = ALIEN_BULLET_SPD + 1.2 + (bossRage ? 1 : 0)
+            for (const vx of [-4.2, -2.0, 0, 2.0, 4.2]) {
+              s.alienBullets.push({ x: bx, y: by, vx, vy: vx === 0 ? spd + 0.5 : spd })
+            }
+          } else {
+            s.alienBullets.push({ x: bx, y: by, vx: 0,    vy: ALIEN_BULLET_SPD + 1.5 })
+            s.alienBullets.push({ x: bx, y: by, vx: -2.8, vy: ALIEN_BULLET_SPD })
+            s.alienBullets.push({ x: bx, y: by, vx:  2.8, vy: ALIEN_BULLET_SPD })
+          }
           boss.shootTimer = 0
         }
 
@@ -283,27 +484,53 @@ export default function SpaceGame({ onBack }) {
         for (let bi = s.bullets.length - 1; bi >= 0; bi--) {
           const b = s.bullets[bi]
           if (Math.abs(b.x - boss.x) < 72 && Math.abs(b.y - boss.y) < 46) {
-            boss.hp--
+            boss.hp -= b.dmg
             s.bullets.splice(bi, 1)
             if (boss.hp <= 0) {
               s.score += 100 * s.wave
               s.explosions.push({ x: boss.x, y: boss.y, frame: 0, max: 45, r: 72, color: '#bb44ff' })
+              spawnItem(s, boss.x, boss.y, 2)
               s.boss = null
               s.wave++
-              s.aliens = makeAliens()
-              s.alienDx = diff.alienSpd * (1 + (s.wave - 1) * 0.18)
-              s.nextAlienShoot = diff.fireMin + Math.floor(Math.random() * 40)
-              s.alienShootTimer = 0
-              s.wavePhase = 'wave'
+              s.wavePhase = 'transition'
+              s.transitionReady = false
+              // 게임보드 정리
+              s.bullets = []
+              s.alienBullets = []
+              s.items = []
+              s.ufoTimer = 0
             }
           }
+        }
+      }
+
+      // ── 웨이브 전환 (클릭 / 스페이스 대기) ────────────────────────
+      if (s.wavePhase === 'transition') {
+        if (s.transitionReady) {
+          s.transitionReady = false
+          const nextWcfg = getWaveCfg(s.wave)
+          s.aliens = makeAliens(s.wave)
+          s.alienTotal = nextWcfg.cols * nextWcfg.rows
+          s.alienDx = diff.alienSpd * (1 + (s.wave - 1) * 0.18)
+          s.nextAlienShoot = diff.fireMin + Math.floor(Math.random() * 40)
+          s.alienShootTimer = 0
+          s.alienDiveTimer = 0
+          s.nextDiveInterval = Math.max(70, 200 - s.wave * 15)
+          s.wavePhase = 'wave'
+          s.waveAnnounce = 90
         }
       }
 
       // 외계인 총알 이동 + 플레이어 충돌
       s.alienBullets = s.alienBullets.filter(b => {
         b.x += b.vx; b.y += b.vy
-        if (s.player.invincible === 0 &&
+        // 방어막 흡수
+        if (hasShield &&
+            Math.abs(b.x - s.player.x) < PS + 32 &&
+            Math.abs(b.y - PLAYER_Y) < PS + 32) {
+          return false
+        }
+        if (!s.ended && s.player.invincible === 0 &&
             Math.abs(b.x - s.player.x) < PS + 6 &&
             Math.abs(b.y - PLAYER_Y) < PS + 10) {
           s.player.invincible = 110
@@ -315,8 +542,25 @@ export default function SpaceGame({ onBack }) {
         return b.y < H + 10 && b.x > -20 && b.x < W + 20
       })
 
+      // 아이템 이동 + 수집
+      s.items = s.items.filter(item => {
+        item.y += ITEM_SPEED; item.frame++
+        if (Math.abs(item.x - s.player.x) < ITEM_RADIUS + PS &&
+            Math.abs(item.y - PLAYER_Y) < ITEM_RADIUS + PS) {
+          applyItem(s, item)
+          return false
+        }
+        return item.y < H + 30
+      })
+
       // 폭발 업데이트
       s.explosions = s.explosions.filter(e => { e.frame++; return e.frame < e.max })
+
+      // 팝업 업데이트
+      s.popups = s.popups.filter(p => { p.frame++; p.y -= 0.7; return p.frame < 55 })
+
+      // 웨이브 텍스트 타이머
+      if (s.waveAnnounce > 0) s.waveAnnounce--
 
       // UI 업데이트
       if (s.frame % 6 === 0) {
@@ -335,53 +579,59 @@ export default function SpaceGame({ onBack }) {
 
   // ── 렌더 ──────────────────────────────────────────────────────────
   return (
-    <div style={s.wrapper}>
-      <div style={s.topBar}>
-        <button style={s.backBtn} onClick={onBack}>← 나가기</button>
+    <div style={st.wrapper}>
+      <div style={st.topBar}>
+        <button style={st.backBtn} onClick={onBack}>← 나가기</button>
       </div>
-      <h1 style={s.title}>🚀 우주 슈팅!</h1>
-      <p style={s.subtitle}>
+      <h1 style={st.title}>🚀 우주 슈팅!</h1>
+      <p style={st.subtitle}>
         {difficulty.emoji} {difficulty.label} &nbsp;·&nbsp; 웨이브 {wave}
       </p>
 
-      <div ref={wrapRef} style={s.gameArea}>
-        <canvas ref={canvasRef} width={W} height={H} style={s.canvas} />
+      <div ref={wrapRef} style={st.gameArea}>
+        <canvas ref={canvasRef} width={W} height={H} style={st.canvas} />
 
-        {/* 캔버스 아래 점수 바 */}
-        <div style={s.scoreCard}>
-          <div style={s.scoreRow}>
-            <div style={s.scoreItem}>
-              <span style={s.scoreLabel}>목숨</span>
-              <span style={s.score}>{'🚀'.repeat(Math.max(0, lives))}</span>
+        <div style={st.scoreCard}>
+          <div style={st.scoreRow}>
+            <div style={st.scoreItem}>
+              <span style={st.scoreLabel}>목숨</span>
+              <span style={st.scoreVal}>{'🚀'.repeat(Math.max(0, lives))}</span>
             </div>
-            <div style={s.scoreDivider} />
-            <div style={s.scoreItem}>
-              <span style={s.scoreLabel}>점수</span>
-              <span style={s.score}>{score}</span>
+            <div style={st.scoreDivider} />
+            <div style={st.scoreItem}>
+              <span style={st.scoreLabel}>점수</span>
+              <span style={st.scoreVal}>{score}</span>
             </div>
-            <div style={s.scoreDivider} />
-            <div style={s.scoreItem}>
-              <span style={s.scoreLabel}>🏆 최고</span>
-              <span style={s.scoreBest}>{best}</span>
+            <div style={st.scoreDivider} />
+            <div style={st.scoreItem}>
+              <span style={st.scoreLabel}>🏆 최고</span>
+              <span style={st.scoreBest}>{best}</span>
             </div>
           </div>
         </div>
 
         {/* 시작 오버레이 */}
         {phase === 'idle' && (
-          <div style={s.overlay}>
-            <div style={s.box}>
-              <div style={s.oTitle}>🚀 우주 슈팅!</div>
-              <div style={s.desc}>
+          <div style={st.overlay}>
+            <div style={st.box}>
+              <div style={st.oTitle}>🚀 우주 슈팅!</div>
+              <div style={st.desc}>
                 <p>외계인 함대를 물리쳐요!</p>
                 <p>보스를 쓰러뜨리면 다음 웨이브!</p>
               </div>
+              <div style={{ fontSize: 'clamp(12px, 2.5vw, 14px)', color: '#aaa', lineHeight: 1.9 }}>
+                {ITEM_TYPES.map(t => (
+                  <span key={t.id} style={{ marginRight: 10, color: t.color, fontWeight: 'bold' }}>
+                    {t.emoji} {t.label}
+                  </span>
+                ))}
+              </div>
               <div>
-                <div style={s.label}>난이도</div>
-                <div style={s.diffRow}>
+                <div style={st.label}>난이도</div>
+                <div style={st.diffRow}>
                   {DIFFICULTIES.map(d => (
                     <button key={d.id} onClick={() => pickDifficulty(d)} style={{
-                      ...s.diffBtn,
+                      ...st.diffBtn,
                       borderColor: difficulty.id === d.id ? d.color : '#444',
                       color: difficulty.id === d.id ? d.color : '#888',
                       background: difficulty.id === d.id ? `${d.color}22` : 'transparent',
@@ -391,10 +641,10 @@ export default function SpaceGame({ onBack }) {
                   ))}
                 </div>
               </div>
-              <div style={s.bestLine}>🏆 최고 {best}점</div>
-              <div style={s.btnGroup}>
-                <button style={s.btnPrimary} onClick={startGame}>시작하기</button>
-                <button style={s.btnBack2} onClick={onBack}>← 게임 선택</button>
+              <div style={st.bestLine}>🏆 최고 {best}점</div>
+              <div style={st.btnGroup}>
+                <button style={st.btnPrimary} onClick={startGame}>시작하기</button>
+                <button style={st.btnBack2} onClick={onBack}>← 게임 선택</button>
               </div>
             </div>
           </div>
@@ -402,16 +652,16 @@ export default function SpaceGame({ onBack }) {
 
         {/* 게임오버 오버레이 */}
         {phase === 'gameover' && (
-          <div style={s.overlay}>
-            <div style={s.box}>
-              <div style={s.oEmoji}>{score >= best ? '🏆' : '😵'}</div>
-              <div style={s.oTitle}>{score >= best ? '신기록!' : '게임 오버!'}</div>
-              <div style={s.bigScore}>{score}점</div>
-              <div style={s.bestScore}>최고 {best}점</div>
-              {score >= best && <div style={s.newBest}>🎉 최고 기록!</div>}
-              <div style={s.btnGroup}>
-                <button style={s.btnPrimary} onClick={startGame}>다시 하기</button>
-                <button style={s.btnBack2} onClick={onBack}>← 게임 선택</button>
+          <div style={st.overlay}>
+            <div style={st.box}>
+              <div style={st.oEmoji}>{score >= best ? '🏆' : '😵'}</div>
+              <div style={st.oTitle}>{score >= best ? '신기록!' : '게임 오버!'}</div>
+              <div style={st.bigScore}>{score}점</div>
+              <div style={st.bestScore}>최고 {best}점</div>
+              {score >= best && <div style={st.newBest}>🎉 최고 기록!</div>}
+              <div style={st.btnGroup}>
+                <button style={st.btnPrimary} onClick={startGame}>다시 하기</button>
+                <button style={st.btnBack2} onClick={onBack}>← 게임 선택</button>
               </div>
             </div>
           </div>
@@ -437,24 +687,57 @@ function drawScene(ctx, s) {
   }
   ctx.globalAlpha = 1
 
+  // UFO
+  if (s.ufo) drawUfo(ctx, s.ufo)
+
   // 외계인
   for (const a of s.aliens) {
     const bob = Math.sin(a.frame * 0.08) * 3
     ctx.save()
-    if (ALIEN_CFG[a.row].hp > 1 && a.hp < ALIEN_CFG[a.row].hp) ctx.globalAlpha = 0.55
+    if (ALIEN_CFG[a.cfgIdx].hp > 1 && a.hp < ALIEN_CFG[a.cfgIdx].hp) ctx.globalAlpha = 0.55
+    if (a.isDiver) {
+      ctx.shadowColor = '#ff4444'; ctx.shadowBlur = 14
+    }
     ctx.font = '34px serif'
-    ctx.fillText(ALIEN_CFG[a.row].emoji, a.x - 17, a.y + bob + 18)
+    ctx.fillText(ALIEN_CFG[a.cfgIdx].emoji, a.x - 17, a.y + bob + 18)
     ctx.restore()
   }
 
   // 보스
   if (s.boss) drawBoss(ctx, s.boss)
 
+  // 아이템
+  for (const item of s.items) {
+    const bob = Math.sin(item.frame * 0.14) * 4
+    ctx.save()
+    ctx.shadowColor = item.type.color; ctx.shadowBlur = 18
+    ctx.strokeStyle = item.type.color
+    ctx.lineWidth = 2
+    ctx.globalAlpha = 0.65 + Math.sin(item.frame * 0.18) * 0.3
+    ctx.beginPath()
+    ctx.arc(item.x, item.y + bob, ITEM_RADIUS, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.globalAlpha = 0.15
+    ctx.fillStyle = item.type.color
+    ctx.fill()
+    ctx.globalAlpha = 1
+    ctx.shadowBlur = 0
+    ctx.font = '18px serif'
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(item.type.emoji, item.x, item.y + bob)
+    ctx.restore()
+  }
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'alphabetic'
+
   // 플레이어 총알
-  ctx.shadowColor = '#00ffff'; ctx.shadowBlur = 10
-  ctx.fillStyle = '#88ffff'
+  const hasPower = !!s.powerups.power
+  ctx.shadowColor = hasPower ? '#ffdd00' : '#00ffff'
+  ctx.shadowBlur   = hasPower ? 14 : 10
+  ctx.fillStyle    = hasPower ? '#ffee88' : '#88ffff'
   for (const b of s.bullets) {
-    ctx.fillRect(b.x - 3, b.y, 6, 18)
+    ctx.fillRect(b.x - (hasPower ? 4 : 3), b.y, hasPower ? 8 : 6, hasPower ? 22 : 18)
   }
   ctx.shadowBlur = 0
 
@@ -486,16 +769,142 @@ function drawScene(ctx, s) {
     ctx.globalAlpha = 1; ctx.shadowBlur = 0
   }
 
+  // 팝업 텍스트
+  ctx.textAlign = 'center'
+  for (const p of s.popups) {
+    const alpha = p.frame < 10 ? p.frame / 10 : 1 - (p.frame - 10) / 45
+    ctx.globalAlpha = Math.max(0, alpha)
+    ctx.shadowColor = p.color; ctx.shadowBlur = 8
+    ctx.fillStyle = p.color
+    ctx.font = 'bold 16px sans-serif'
+    ctx.fillText(p.text, p.x, p.y)
+  }
+  ctx.globalAlpha = 1; ctx.shadowBlur = 0; ctx.textAlign = 'left'
+
   // 플레이어
-  drawPlayer(ctx, s.player.x, s.player.invincible, s.frame)
+  drawPlayer(ctx, s.player, s.powerups, s.frame)
+
+  // 파워업 HUD (캔버스 우상단)
+  drawPowerupHud(ctx, s.powerups)
+
+  // 웨이브 전환 — 클릭/스페이스 안내
+  if (s.wavePhase === 'transition') {
+    const blink = Math.floor(s.frame / 28) % 2 === 0
+    ctx.save()
+    ctx.globalAlpha = blink ? 1 : 0.45
+    ctx.textAlign = 'center'
+    ctx.font = 'bold 28px sans-serif'
+    ctx.fillStyle = '#aaddff'
+    ctx.shadowColor = '#4488ff'; ctx.shadowBlur = 16
+    ctx.fillText('클릭 또는 스페이스로 다음 웨이브 시작!', W / 2, H / 2 + 60)
+    ctx.restore()
+    ctx.textAlign = 'left'
+  }
+
+  // 웨이브 알림 텍스트
+  if (s.waveAnnounce > 0) {
+    const timer = s.waveAnnounce
+    let alpha
+    if (timer > 70) alpha = (90 - timer) / 20
+    else if (timer < 20) alpha = timer / 20
+    else alpha = 1
+    ctx.save()
+    ctx.globalAlpha = alpha
+    ctx.textAlign = 'center'
+    ctx.font = 'bold 62px sans-serif'
+    ctx.fillStyle = '#FFD700'
+    ctx.shadowColor = '#FFD700'; ctx.shadowBlur = 28
+    ctx.fillText(`WAVE ${s.wave}`, W / 2, H / 2 - 18)
+    const sub = WAVE_SUBTITLES[Math.min(s.wave, WAVE_SUBTITLES.length - 1)]
+    if (s.wave > 1 && sub) {
+      ctx.font = 'bold 26px sans-serif'
+      ctx.fillStyle = '#ffffff'
+      ctx.shadowBlur = 10
+      ctx.fillText(sub, W / 2, H / 2 + 26)
+    }
+    ctx.restore()
+    ctx.textAlign = 'left'
+  }
 }
 
-function drawPlayer(ctx, x, invincible, frame) {
-  const blink = invincible > 0 && Math.floor(invincible / 6) % 2 === 1
+function drawUfo(ctx, ufo) {
+  ctx.save()
+  ctx.translate(ufo.x, ufo.y)
+  ctx.shadowColor = '#ff44ff'; ctx.shadowBlur = 16
+
+  // 본체
+  ctx.fillStyle = '#cc66ff'
+  ctx.beginPath()
+  ctx.ellipse(0, 5, 32, 10, 0, 0, Math.PI * 2)
+  ctx.fill()
+
+  // 돔
+  ctx.fillStyle = '#eeccff'
+  ctx.shadowColor = '#eeccff'; ctx.shadowBlur = 8
+  ctx.beginPath()
+  ctx.ellipse(0, -4, 18, 14, 0, Math.PI, Math.PI * 2)
+  ctx.fill()
+
+  // 점멸 등
+  const blink = Math.floor(ufo.frame / 6) % 2 === 0
+  for (let i = -16; i <= 16; i += 8) {
+    ctx.fillStyle = blink ? '#ffff44' : '#ff4444'
+    ctx.shadowColor = ctx.fillStyle; ctx.shadowBlur = 6
+    ctx.beginPath(); ctx.arc(i, 6, 3, 0, Math.PI * 2); ctx.fill()
+  }
+
+  ctx.restore()
+  ctx.font = 'bold 11px sans-serif'
+  ctx.fillStyle = '#ff88ff'
+  ctx.textAlign = 'center'
+  ctx.fillText('+200 🎁', ufo.x, ufo.y - 20)
+  ctx.textAlign = 'left'
+}
+
+function drawPowerupHud(ctx, powerups) {
+  let py = 10
+  ctx.textAlign = 'left'
+  for (const cfg of ITEM_TYPES) {
+    const t = powerups[cfg.id]
+    if (!t || cfg.duration === 0) continue
+    const ratio = t / cfg.duration
+    ctx.globalAlpha = 0.9
+    ctx.font = '16px serif'
+    ctx.fillText(cfg.emoji, W - 104, py + 14)
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'
+    ctx.fillRect(W - 82, py + 3, 70, 10)
+    ctx.fillStyle = cfg.color
+    ctx.shadowColor = cfg.color; ctx.shadowBlur = 6
+    ctx.fillRect(W - 82, py + 3, 70 * ratio, 10)
+    ctx.shadowBlur = 0
+    ctx.strokeStyle = cfg.color + '88'
+    ctx.lineWidth = 1
+    ctx.strokeRect(W - 82, py + 3, 70, 10)
+    ctx.globalAlpha = 1
+    py += 24
+  }
+}
+
+function drawPlayer(ctx, player, powerups, frame) {
+  const blink = player.invincible > 0 && Math.floor(player.invincible / 6) % 2 === 1
   if (blink) return
+  const { x } = player
   const y = PLAYER_Y
   ctx.save()
   ctx.translate(x, y)
+
+  // 방어막
+  if (powerups.shield) {
+    const pulse = Math.sin(frame * 0.18) * 5
+    ctx.shadowColor = '#4488ff'; ctx.shadowBlur = 20
+    ctx.strokeStyle = `rgba(68,136,255,${0.5 + Math.sin(frame * 0.18) * 0.35})`
+    ctx.lineWidth = 3
+    ctx.beginPath()
+    ctx.arc(0, -4, 38 + pulse, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.shadowBlur = 0
+  }
+
   ctx.shadowColor = '#0088ff'; ctx.shadowBlur = 18
 
   // 날개
@@ -544,7 +953,6 @@ function drawBoss(ctx, boss) {
   ctx.translate(x, y)
   ctx.shadowColor = '#bb44ff'; ctx.shadowBlur = 24
 
-  // 본체 (접시 형태)
   const g = ctx.createRadialGradient(0, 5, 5, 0, 5, 74)
   g.addColorStop(0, `hsl(${280 - hpRatio * 60}, 80%, 65%)`)
   g.addColorStop(1, '#330055')
@@ -553,20 +961,19 @@ function drawBoss(ctx, boss) {
   ctx.ellipse(0, 10, 72 + pulse, 26, 0, 0, Math.PI * 2)
   ctx.fill()
 
-  // 돔
   ctx.fillStyle = '#dd99ff'
   ctx.shadowColor = '#dd99ff'; ctx.shadowBlur = 10
   ctx.beginPath()
   ctx.ellipse(0, -8, 38, 32, 0, Math.PI, Math.PI * 2)
   ctx.fill()
 
-  // 눈
-  ctx.fillStyle = '#ff0033'
-  ctx.shadowColor = '#ff0033'; ctx.shadowBlur = 14
-  ctx.beginPath(); ctx.arc(-20, -12, 8, 0, Math.PI * 2); ctx.fill()
-  ctx.beginPath(); ctx.arc( 20, -12, 8, 0, Math.PI * 2); ctx.fill()
+  const eyeColor = hpRatio < 0.4 ? '#ff0000' : '#ff0033'
+  const eyeR = hpRatio < 0.4 ? 10 + Math.sin(frame * 0.3) * 2 : 8
+  ctx.fillStyle = eyeColor
+  ctx.shadowColor = eyeColor; ctx.shadowBlur = hpRatio < 0.4 ? 22 : 14
+  ctx.beginPath(); ctx.arc(-20, -12, eyeR, 0, Math.PI * 2); ctx.fill()
+  ctx.beginPath(); ctx.arc( 20, -12, eyeR, 0, Math.PI * 2); ctx.fill()
 
-  // 포신
   ctx.fillStyle = '#555'; ctx.shadowBlur = 0
   ctx.fillRect(-5, 26, 10, 22)
   ctx.fillRect(-26, 18, 8, 16)
@@ -574,7 +981,6 @@ function drawBoss(ctx, boss) {
 
   ctx.restore()
 
-  // HP 바
   const bw = 160, bh = 10
   const bx = x - bw / 2, by = y - 62
   ctx.fillStyle = '#222'; ctx.fillRect(bx, by, bw, bh)
@@ -589,7 +995,7 @@ function drawBoss(ctx, boss) {
 }
 
 // ── 스타일 ───────────────────────────────────────────────────────────
-const s = {
+const st = {
   wrapper: {
     fontFamily: '"Segoe UI", sans-serif',
     background: '#0f0f1e',
@@ -669,7 +1075,7 @@ const s = {
     gap: 2,
   },
   scoreLabel: { color: '#666', fontSize: 'clamp(10px, 2vw, 12px)' },
-  score:      { color: '#FFD700', fontWeight: 'bold', fontSize: 'clamp(14px, 3vw, 18px)' },
+  scoreVal:   { color: '#FFD700', fontWeight: 'bold', fontSize: 'clamp(14px, 3vw, 18px)' },
   scoreBest:  { color: '#aaa', fontWeight: 'bold', fontSize: 'clamp(14px, 3vw, 18px)' },
   scoreDivider: { width: 1, height: 32, background: '#333', margin: '0 8px' },
   overlay: {
@@ -691,7 +1097,7 @@ const s = {
     display: 'flex',
     flexDirection: 'column',
     gap: 14,
-    maxWidth: 340,
+    maxWidth: 360,
     width: '90%',
   },
   oEmoji: { fontSize: 'clamp(36px, 8vw, 56px)' },
