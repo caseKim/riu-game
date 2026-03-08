@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 
 // ── 상수 ────────────────────────────────────────────────────────────
 const W = 900
-const H = 620
+const H = 720
 const PLAYER_Y = H - 72
 const PS = 22           // 플레이어 충돌 반경
 const BULLET_SPD = 13
