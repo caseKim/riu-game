@@ -301,28 +301,24 @@ export default function SnakeGame({ onBack }) {
                   b.alive = false
                   a.targetLen += Math.floor(lenB * 0.5)
                   if (a.isPlayer) s.score += Math.max(5, Math.floor(lenB / 2))
-                  b.segs.filter((_, idx) => idx % 4 === 0).forEach(sg =>
-                    s.foods.push({ x: sg.x, y: sg.y, r: rand(4, 8), color: b.color })
-                  )
+                  for (let si = 0; si < b.segs.length; si += 4)
+                    s.foods.push({ x: b.segs[si].x, y: b.segs[si].y, r: rand(4, 8), color: b.color })
                 } else {
                   a.alive = false
-                  a.segs.filter((_, idx) => idx % 4 === 0).forEach(sg =>
-                    s.foods.push({ x: sg.x, y: sg.y, r: rand(4, 8), color: a.color })
-                  )
+                  for (let si = 0; si < a.segs.length; si += 4)
+                    s.foods.push({ x: a.segs[si].x, y: a.segs[si].y, r: rand(4, 8), color: a.color })
                 }
               } else {
                 // Body hit: A shorter than B → A dies; A longer/equal → cut B's tail
                 if (lenA < lenB) {
                   a.alive = false
-                  a.segs.filter((_, idx) => idx % 4 === 0).forEach(sg =>
-                    s.foods.push({ x: sg.x, y: sg.y, r: rand(4, 8), color: a.color })
-                  )
+                  for (let si = 0; si < a.segs.length; si += 4)
+                    s.foods.push({ x: a.segs[si].x, y: a.segs[si].y, r: rand(4, 8), color: a.color })
                 } else {
                   const cutSegs = b.segs.splice(k)
                   b.targetLen = b.segs.length
-                  cutSegs.filter((_, idx) => idx % 3 === 0).forEach(sg =>
-                    s.foods.push({ x: sg.x, y: sg.y, r: rand(4, 7), color: b.color })
-                  )
+                  for (let si = 0; si < cutSegs.length; si += 3)
+                    s.foods.push({ x: cutSegs[si].x, y: cutSegs[si].y, r: rand(4, 7), color: b.color })
                   a.targetLen += Math.max(1, Math.floor(cutSegs.length * 0.4))
                   if (a.isPlayer) s.score += Math.max(1, Math.floor(cutSegs.length / 4))
                 }
@@ -359,10 +355,13 @@ export default function SnakeGame({ onBack }) {
         return
       }
 
+      // Compute alive snakes once (used for UI update + draw)
+      const liveSnakes = s.snakes.filter(sn => sn.alive)
+
       // UI updates
       if (s.frame % 8 === 0 && pSn) {
         setScore(s.score)
-        setAliveCount(s.snakes.filter(sn => sn.alive).length)
+        setAliveCount(liveSnakes.length)
         setPlayerLen(pSn.segs.length)
       }
 
@@ -410,8 +409,7 @@ export default function SnakeGame({ onBack }) {
       }
 
       // Find longest snake for crown
-      const liveSns = s.snakes.filter(sn => sn.alive)
-      const longestSn = liveSns.length > 0 ? liveSns.reduce((a, b) => a.segs.length >= b.segs.length ? a : b) : null
+      const longestSn = liveSnakes.length > 0 ? liveSnakes.reduce((a, b) => a.segs.length >= b.segs.length ? a : b) : null
       const playerLenDraw = pSn ? pSn.segs.length : 0
 
       // Snakes
@@ -612,111 +610,80 @@ export default function SnakeGame({ onBack }) {
         </div>
       )}
 
-      {/* Start overlay */}
-      {phase === 'idle' && (
-        <div style={s.overlay}>
-          <div style={s.box}>
-            <div style={s.title}>뱀 게임</div>
-            <div style={s.desc}>
-              <p>더 작은 뱀을 먹어서 크게 자라요!</p>
-              <p>나보다 큰 뱀은 조심하세요 위험해요!</p>
+      {/* Shared: difficulty picker + color picker (used in both overlays) */}
+      {(phase === 'idle' || phase === 'gameover') && (() => {
+        const diffPicker = (
+          <div>
+            <div style={s.colorLabel}>난이도</div>
+            <div style={s.diffRow}>
+              {DIFFICULTIES.map(d => (
+                <button
+                  key={d.id}
+                  onClick={() => pickDifficulty(d)}
+                  style={{
+                    ...s.diffBtn,
+                    borderColor: difficulty.id === d.id ? d.color : '#444',
+                    color: difficulty.id === d.id ? d.color : '#888',
+                    background: difficulty.id === d.id ? `${d.color}22` : 'transparent',
+                  }}
+                >
+                  {d.emoji} {d.label}
+                </button>
+              ))}
             </div>
-            <div>
-              <div style={s.colorLabel}>난이도</div>
-              <div style={s.diffRow}>
-                {DIFFICULTIES.map(d => (
-                  <button
-                    key={d.id}
-                    onClick={() => pickDifficulty(d)}
-                    style={{
-                      ...s.diffBtn,
-                      borderColor: difficulty.id === d.id ? d.color : '#444',
-                      color: difficulty.id === d.id ? d.color : '#888',
-                      background: difficulty.id === d.id ? `${d.color}22` : 'transparent',
-                    }}
-                  >
-                    {d.emoji} {d.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-            <div>
-              <div style={s.colorLabel}>내 뱀 색깔</div>
-              <div style={s.colorGrid}>
-                {['#FFD700', ...COLORS].map(c => (
-                  <button
-                    key={c}
-                    onClick={() => pickColor(c)}
-                    style={{
-                      ...s.colorSwatch,
-                      background: c,
-                      transform: playerColor === c ? 'scale(1.25)' : 'scale(1)',
-                      outline: playerColor === c ? `3px solid #fff` : '3px solid transparent',
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-            <button style={s.btnPrimary} onClick={startGame}>
-              시작하기
-            </button>
-            <button style={s.btnBack} onClick={onBack}>← 게임 선택</button>
           </div>
-        </div>
-      )}
-
-      {/* Game over overlay */}
-      {phase === 'gameover' && (
-        <div style={s.overlay}>
-          <div style={s.box}>
-            <div style={s.oEmoji}>{score > 0 && score >= best ? '🏆' : '😵'}</div>
-            <div style={s.title}>{score > 0 && score >= best ? '신기록!' : '게임 오버'}</div>
-            <div style={s.bigScore}>{score}점</div>
-            <div style={s.bestScore}>최고 {best}점</div>
-            {score > 0 && score >= best && (
-              <div style={s.newBest}>🎉 최고 기록!</div>
-            )}
-            <div>
-              <div style={s.colorLabel}>난이도</div>
-              <div style={s.diffRow}>
-                {DIFFICULTIES.map(d => (
-                  <button
-                    key={d.id}
-                    onClick={() => pickDifficulty(d)}
-                    style={{
-                      ...s.diffBtn,
-                      borderColor: difficulty.id === d.id ? d.color : '#444',
-                      color: difficulty.id === d.id ? d.color : '#888',
-                      background: difficulty.id === d.id ? `${d.color}22` : 'transparent',
-                    }}
-                  >
-                    {d.emoji} {d.label}
-                  </button>
-                ))}
-              </div>
+        )
+        const colorPicker = (label) => (
+          <div>
+            <div style={s.colorLabel}>{label}</div>
+            <div style={s.colorGrid}>
+              {['#FFD700', ...COLORS].map(c => (
+                <button
+                  key={c}
+                  onClick={() => pickColor(c)}
+                  style={{
+                    ...s.colorSwatch,
+                    background: c,
+                    transform: playerColor === c ? 'scale(1.25)' : 'scale(1)',
+                    outline: playerColor === c ? `3px solid #fff` : '3px solid transparent',
+                  }}
+                />
+              ))}
             </div>
-            <div>
-              <div style={s.colorLabel}>색깔 바꾸기</div>
-              <div style={s.colorGrid}>
-                {['#FFD700', ...COLORS].map(c => (
-                  <button
-                    key={c}
-                    onClick={() => pickColor(c)}
-                    style={{
-                      ...s.colorSwatch,
-                      background: c,
-                      transform: playerColor === c ? 'scale(1.25)' : 'scale(1)',
-                      outline: playerColor === c ? `3px solid #fff` : '3px solid transparent',
-                    }}
-                  />
-                ))}
-              </div>
-            </div>
-            <button style={s.btnPrimary} onClick={startGame}>다시 하기</button>
-            <button style={s.btnBack} onClick={onBack}>← 게임 선택</button>
           </div>
-        </div>
-      )}
+        )
+        if (phase === 'idle') return (
+          <div style={s.overlay}>
+            <div style={s.box}>
+              <div style={s.title}>뱀 게임</div>
+              <div style={s.desc}>
+                <p>더 작은 뱀을 먹어서 크게 자라요!</p>
+                <p>나보다 큰 뱀은 조심하세요 위험해요!</p>
+              </div>
+              {diffPicker}
+              {colorPicker('내 뱀 색깔')}
+              <button style={s.btnPrimary} onClick={startGame}>시작하기</button>
+              <button style={s.btnBack} onClick={onBack}>← 게임 선택</button>
+            </div>
+          </div>
+        )
+        const isNewBest = score > 0 && score >= best
+        return (
+          <div style={s.overlay}>
+            <div style={s.box}>
+              <div style={s.oEmoji}>{isNewBest ? '🏆' : '😵'}</div>
+              <div style={s.title}>{isNewBest ? '신기록!' : '게임 오버'}</div>
+              <div style={s.bigScore}>{score}점</div>
+              <div style={s.bestScore}>최고 {best}점</div>
+              {isNewBest && <div style={s.newBest}>🎉 최고 기록!</div>}
+              {diffPicker}
+              {colorPicker('색깔 바꾸기')}
+              <button style={s.btnPrimary} onClick={startGame}>다시 하기</button>
+              <button style={s.btnBack} onClick={onBack}>← 게임 선택</button>
+            </div>
+          </div>
+        )
+      })()}
     </div>
   )
 }
