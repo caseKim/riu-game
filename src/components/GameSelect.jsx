@@ -28,6 +28,13 @@ const GAMES = [
     available: true,
   },
   {
+    id: 'platform',
+    emoji: '🐸',
+    name: '플랫폼 점프',
+    desc: '발판을 밟고 높이 올라가요!',
+    available: true,
+  },
+  {
     id: 'drawing',
     emoji: '🎨',
     name: '그림 그리기',
