@@ -255,6 +255,7 @@ export default function PlatformGame({ onBack }) {
     }
 
     function onTouchEnd(e) {
+      if (e.target.closest('button')) return
       e.preventDefault()
       const { left, right } = getTouchSides(e.touches)
       touchRef.current = { left, right }
