@@ -66,9 +66,9 @@ const ITEMS = [
 ]
 
 const DIFF_SETTINGS = {
-  easy:   { baseSpeed: 4, intervalMax: 130, intervalMin: 60, doubleScore: 9999, doubleChance: 0,    maxSpeed: 9  },
-  normal: { baseSpeed: 6, intervalMax: 100, intervalMin: 40, doubleScore: 30,   doubleChance: 0.30, maxSpeed: 14 },
-  hard:   { baseSpeed: 8, intervalMax: 75,  intervalMin: 28, doubleScore: 15,   doubleChance: 0.45, maxSpeed: 18 },
+  easy:   { baseSpeed: 4, intervalMax: 130, intervalMin: 60, doubleScore: 9999, doubleChance: 0,    maxSpeed: 9,  enemyMult: 1.6 },
+  normal: { baseSpeed: 6, intervalMax: 100, intervalMin: 40, doubleScore: 30,   doubleChance: 0.30, maxSpeed: 14, enemyMult: 1.0 },
+  hard:   { baseSpeed: 8, intervalMax: 75,  intervalMin: 28, doubleScore: 15,   doubleChance: 0.45, maxSpeed: 18, enemyMult: 0.65 },
 }
 
 export default function Game({ onBack }) {
@@ -121,6 +121,9 @@ export default function Game({ onBack }) {
       nextItemInterval: 450 + Math.floor(Math.random() * 250),
       itemPopups: [],
       active: { invincible: 0, triple: 0, double: 0, magnet: 0 },
+      enemies: [],
+      enemyTimer: 0,
+      nextEnemyInterval: Math.floor(180 * d.enemyMult),
     }
   }
 
@@ -335,12 +338,85 @@ export default function Game({ onBack }) {
             }
           }
         }
+
+        // 적 스폰
+        s.enemyTimer++
+        if (s.enemyTimer >= s.nextEnemyInterval) {
+          const kind = pickEnemyKind(s.score)
+          if (kind) s.enemies.push(makeEnemy(kind))
+          s.enemyTimer = 0
+          const baseInterval = Math.max(120, 500 - Math.floor(s.score / 3) * 12)
+          s.nextEnemyInterval = Math.floor(baseInterval * diff.enemyMult)
+        }
+
+        // 적 이동
+        const enemySpd = curSpd * 0.8
+        s.enemies = s.enemies.filter((e) => {
+          e.frame++
+          if (e.kind === 'bat') {
+            e.x -= enemySpd
+            e.y = e.baseY + Math.sin(e.frame * e.freq) * e.amp
+          } else if (e.kind === 'ghost') {
+            e.x -= enemySpd * 0.85
+            e.y += (p.y - e.y) * 0.025
+          } else if (e.kind === 'bomb') {
+            e.x -= enemySpd * 0.2
+            if (e.exploding > 0) { e.exploding--; return e.exploding > 0 }
+            e.vy += 0.2
+            e.y += e.vy
+            if (e.y + e.h >= GROUND_Y) { e.exploding = 18; e.y = GROUND_Y - e.h }
+          }
+          return e.x + e.w > -60
+        })
+
+        // 적 충돌 (무적 시 스킵)
+        if (s.active.invincible === 0) {
+          const survived = []
+          let died = false
+          for (const e of s.enemies) {
+            if (e.kind === 'bomb' && e.exploding > 0) { survived.push(e); continue }
+            const hitX = p.x + 10 < e.x + e.w - 4 && p.x + PLAYER_SIZE - 10 > e.x + 4
+            const hitY = p.y + 10 < e.y + e.h && p.y + PLAYER_SIZE - 6 > e.y
+            if (hitX && hitY) {
+              // 밟기: 아래로 내려오면서 적 위쪽에 닿을 때 (폭탄 제외)
+              if (p.vy > 0 && p.y + PLAYER_SIZE - 6 < e.y + e.h * 0.45 && e.kind !== 'bomb') {
+                p.vy = JUMP_FORCE * 0.7
+                s.score += 5
+                setScore(Math.floor(s.score))
+                s.itemPopups.push({ text: '+5 ⭐', x: e.x + e.w / 2, y: e.y, life: 50 })
+                // 적 제거 (survived에 추가 안 함)
+              } else {
+                died = true
+                survived.push(e)
+              }
+            } else {
+              survived.push(e)
+            }
+          }
+          s.enemies = survived
+          if (died) {
+            const finalScore = Math.floor(s.score)
+            setBest(prev => {
+              if (finalScore > prev) { localStorage.setItem(bestKey, finalScore); return finalScore }
+              return prev
+            })
+            gameOverAtRef.current = Date.now()
+            setPhase('gameover')
+          }
+        }
       }
 
       // 장애물 그리기
       for (const o of s.obstacles) {
         ctx.save()
         drawObstacle(ctx, o)
+        ctx.restore()
+      }
+
+      // 적 그리기
+      for (const e of s.enemies) {
+        ctx.save()
+        drawEnemy(ctx, e)
         ctx.restore()
       }
 
@@ -652,6 +728,55 @@ function drawObstacle(ctx, o) {
   else if (o.kind === 'bird')   drawBird(ctx, o)
   else if (o.kind === 'spike')  drawSpike(ctx, o)
   else if (o.kind === 'fire')   drawFire(ctx, o)
+}
+
+// ─── 적 로직 ────────────────────────────────────────────
+
+function pickEnemyKind(score) {
+  if (score < 3) return null
+  if (score < 25) return 'bat'
+  if (score < 40) return Math.random() < 0.6 ? 'bat' : 'ghost'
+  const r = Math.random()
+  if (r < 0.40) return 'bat'
+  if (r < 0.70) return 'ghost'
+  return 'bomb'
+}
+
+function makeEnemy(kind) {
+  if (kind === 'bat') {
+    const baseY = 100 + Math.random() * 170
+    return { kind, frame: 0, x: W + 10, y: baseY, baseY, amp: 45 + Math.random() * 45, freq: 0.028 + Math.random() * 0.022, w: 50, h: 38 }
+  }
+  if (kind === 'ghost') {
+    return { kind, frame: 0, x: W + 10, y: 80 + Math.random() * 160, w: 45, h: 45 }
+  }
+  // bomb: 위에서 떨어짐
+  return { kind, frame: 0, x: W * 0.4 + Math.random() * W * 0.45, y: -30, vy: 1.5 + Math.random() * 1.5, w: 42, h: 42, exploding: 0 }
+}
+
+function drawEnemy(ctx, e) {
+  if (e.kind === 'bat') {
+    ctx.shadowColor = '#FF3333'; ctx.shadowBlur = 12 + Math.sin(e.frame * 0.1) * 4
+    ctx.font = '44px serif'
+    ctx.fillText('🦇', e.x, e.y + e.h)
+  } else if (e.kind === 'ghost') {
+    ctx.globalAlpha = 0.8 + Math.sin(e.frame * 0.1) * 0.2
+    ctx.shadowColor = '#9933FF'; ctx.shadowBlur = 14
+    ctx.font = '44px serif'
+    ctx.fillText('👻', e.x, e.y + e.h)
+  } else if (e.kind === 'bomb') {
+    if (e.exploding > 0) {
+      ctx.globalAlpha = e.exploding / 18
+      ctx.font = `${42 + (18 - e.exploding) * 2}px serif`
+      ctx.fillText('💥', e.x - 14, e.y + e.h + 14)
+    } else {
+      ctx.shadowColor = '#FF6600'; ctx.shadowBlur = 10
+      ctx.translate(e.x + e.w / 2, e.y + e.h / 2)
+      ctx.rotate(Math.min(e.vy * 0.07, 0.5))
+      ctx.font = '42px serif'
+      ctx.fillText('💣', -21, 22)
+    }
+  }
 }
 
 // ─── 장애물 그리기 ────────────────────────────────────────────
