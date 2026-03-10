@@ -25,9 +25,9 @@ const FISH_TYPES = [
   { emoji: '🐡', pts: 3,  sz: 44, spd: 2.0, rate: 0.14 },
   { emoji: '🦑', pts: 5,  sz: 40, spd: 1.5, rate: 0.10 },
   { emoji: '🐙', pts: 8,  sz: 50, spd: 1.0, rate: 0.07 },
-  { emoji: '🦈', pts: 15, sz: 62, spd: 4.0, rate: 0.05 },
-  { emoji: '🐋', pts: 20, sz: 70, spd: 0.8, rate: 0.03 },
-  { emoji: '🦕', pts: 30, sz: 78, spd: 0.5, rate: 0.01 },
+  { emoji: '🦈', pts: 30, sz: 62, spd: 4.0, rate: 0.05 },
+  { emoji: '🐋', pts: 40, sz: 70, spd: 0.8, rate: 0.03 },
+  { emoji: '🦕', pts: 50, sz: 78, spd: 0.5, rate: 0.01 },
 ]
 
 const DIFFICULTIES = [
