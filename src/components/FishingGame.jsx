@@ -57,6 +57,33 @@ function emojiCanvas(emoji, size) {
   return (_emojiCache[key] = oc)
 }
 
+function drawFish(ctx, emoji, sz, x, y, flipH = false) {
+  const oc = emojiCanvas(emoji, sz)
+  if (flipH) {
+    ctx.save()
+    ctx.translate(x, y)
+    ctx.scale(-1, 1)
+    ctx.drawImage(oc, -sz, -sz, sz * 2, sz * 2)
+    ctx.restore()
+  } else {
+    ctx.drawImage(oc, x - sz, y - sz, sz * 2, sz * 2)
+  }
+}
+
+// 배경 그라디언트 캐시 (매 프레임 재생성 방지)
+let _bgGrad = null
+function getBgGrad(ctx) {
+  if (_bgGrad) return _bgGrad
+  const sky = ctx.createLinearGradient(0, 0, 0, WATER_Y)
+  sky.addColorStop(0, '#5BA8E0')
+  sky.addColorStop(1, '#B8DEFF')
+  const water = ctx.createLinearGradient(0, WATER_Y, 0, H)
+  water.addColorStop(0,   '#1A8FD1')
+  water.addColorStop(0.3, '#1060A0')
+  water.addColorStop(1,   '#062860')
+  return (_bgGrad = { sky, water })
+}
+
 function pickType() {
   let r = Math.random(), cum = 0
   for (const t of FISH_TYPES) { cum += t.rate; if (r < cum) return t }
@@ -357,9 +384,7 @@ export default function FishingGame({ onBack }) {
 
 function drawBg(ctx, s) {
   // 하늘
-  const sky = ctx.createLinearGradient(0, 0, 0, WATER_Y)
-  sky.addColorStop(0, '#5BA8E0')
-  sky.addColorStop(1, '#B8DEFF')
+  const { sky, water: waterGrad } = getBgGrad(ctx)
   ctx.fillStyle = sky
   ctx.fillRect(0, 0, W, WATER_Y)
 
@@ -387,11 +412,7 @@ function drawBg(ctx, s) {
   }
 
   // 물
-  const water = ctx.createLinearGradient(0, WATER_Y, 0, H)
-  water.addColorStop(0,   '#1A8FD1')
-  water.addColorStop(0.3, '#1060A0')
-  water.addColorStop(1,   '#062860')
-  ctx.fillStyle = water
+  ctx.fillStyle = waterGrad
   ctx.fillRect(0, WATER_Y, W, H - WATER_Y)
 
   // 파도
@@ -424,19 +445,8 @@ function draw(ctx, s) {
     ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.stroke()
   }
 
-  // 물고기 (iOS Safari: scale+fillText 버그 → offscreen drawImage)
-  for (const f of s.fish) {
-    const oc = emojiCanvas(f.emoji, f.sz)
-    if (f.vx < 0) {
-      ctx.save()
-      ctx.translate(f.x, f.y)
-      ctx.scale(-1, 1)
-      ctx.drawImage(oc, -f.sz, -f.sz, f.sz * 2, f.sz * 2)
-      ctx.restore()
-    } else {
-      ctx.drawImage(oc, f.x - f.sz, f.y - f.sz, f.sz * 2, f.sz * 2)
-    }
-  }
+  // 물고기
+  for (const f of s.fish) drawFish(ctx, f.emoji, f.sz, f.x, f.y, f.vx < 0)
 
   // 낚싯줄
   ctx.strokeStyle = 'rgba(220,215,200,0.9)'
@@ -460,10 +470,7 @@ function draw(ctx, s) {
   }
 
   // 잡힌 물고기
-  if (s.hooked) {
-    const hoc = emojiCanvas(s.hooked.emoji, s.hooked.sz)
-    ctx.drawImage(hoc, ROD_TIP_X - s.hooked.sz, s.hooked.y - s.hooked.sz, s.hooked.sz * 2, s.hooked.sz * 2)
-  }
+  if (s.hooked) drawFish(ctx, s.hooked.emoji, s.hooked.sz, ROD_TIP_X, s.hooked.y)
 
   // 낚싯대
   ctx.strokeStyle = '#6B3A0F'
