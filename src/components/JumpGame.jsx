@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { randInt } from '../utils/gameUtils'
 
 const CHARACTERS = {
   animals: [
@@ -55,6 +56,7 @@ const GRAVITY = 0.65
 const JUMP_FORCE = -15
 
 const FRUITS = ['🍎', '🍊', '🍋', '🍇', '🍓', '🍒']
+const SIMPLE_KINDS = ['rock', 'cactus', 'spike']
 // 먹을 수 있는 높이 (너무 어렵지 않게 — 지면~낮은 점프 범위)
 const FRUIT_HEIGHTS = [GROUND_Y - 45, GROUND_Y - 80, GROUND_Y - 120]
 
@@ -225,8 +227,7 @@ export default function Game({ onBack }) {
           if (s.doubleCooldown > 0) {
             s.doubleCooldown--
           } else if (s.score > diff.doubleScore && Math.random() < diff.doubleChance) {
-            const simpleKinds = ['rock', 'cactus', 'spike']
-            const k2 = simpleKinds[Math.floor(Math.random() * simpleKinds.length)]
+            const k2 = SIMPLE_KINDS[randInt(0, SIMPLE_KINDS.length - 1)]
             const o2 = makeObstacle(k2)
             o2.x += 260 + Math.random() * 80
             s.obstacles.push(o2)
@@ -763,25 +764,25 @@ function pickEnemyKind(score) {
 }
 
 function makeEnemy(kind) {
-  const fromTop = Math.random() < 0.35
   if (kind === 'bat') {
-    if (fromTop) {
-      return { kind, dir: 'top', frame: 0, x: 80 + Math.random() * (W - 200), y: -40,
+    if (Math.random() < 0.35) {
+      const x = randInt(80, W - 120)
+      return { kind, dir: 'top', frame: 0, x, y: -40, baseY: -40,
         vx: -(1 + Math.random() * 1.5), vy: 1.8 + Math.random() * 1.2,
         amp: 30 + Math.random() * 40, freq: 0.025 + Math.random() * 0.025, w: 50, h: 38 }
     }
-    const baseY = 55 + Math.random() * 250
+    const baseY = randInt(55, 305)
     return { kind, dir: 'right', frame: 0, x: W + 10, y: baseY, baseY,
       amp: 30 + Math.random() * 60, freq: 0.022 + Math.random() * 0.03, w: 50, h: 38 }
   }
   if (kind === 'ghost') {
-    if (fromTop) {
-      return { kind, dir: 'top', frame: 0, x: 80 + Math.random() * (W - 200), y: -40, w: 45, h: 45 }
+    if (Math.random() < 0.35) {
+      return { kind, dir: 'top', frame: 0, x: randInt(80, W - 120), y: -40, w: 45, h: 45 }
     }
-    return { kind, dir: 'right', frame: 0, x: W + 10, y: 55 + Math.random() * 230, w: 45, h: 45 }
+    return { kind, dir: 'right', frame: 0, x: W + 10, y: randInt(55, 285), w: 45, h: 45 }
   }
-  // bomb: 위에서 떨어짐 (더 넓은 x 범위)
-  return { kind, frame: 0, x: 80 + Math.random() * (W - 200), y: -30, vy: 1.5 + Math.random() * 2, w: 42, h: 42, exploding: 0 }
+  // bomb: 위에서 떨어짐
+  return { kind, frame: 0, x: randInt(80, W - 120), y: -30, vy: 1.5 + Math.random() * 2, w: 42, h: 42, exploding: 0 }
 }
 
 function drawEnemy(ctx, e) {
