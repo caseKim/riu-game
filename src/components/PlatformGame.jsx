@@ -15,6 +15,10 @@ const PLAYER_FEET = 14
 const CAM_THRESH = H * 0.38
 const MOVE_SPD = 4.5
 
+const ENEMY_EMOJIS = ['👾','💀','🦇','👻','🕷️']
+const ENEMY_SIZE = 28
+const ENEMY_HALF_W = 11
+
 const DIFFICULTIES = [
   { id: 'easy',   label: '쉬움',   emoji: '🌱', color: '#4CAF50' },
   { id: 'normal', label: '보통',   emoji: '⚡', color: '#FFD700' },
@@ -27,9 +31,23 @@ const DIFF_SETTINGS = {
   hard:   { gapY: 125, platWMin: 58,  platWMax: 90,  movingChance: 0.45, moveSpd: 3.5 },
 }
 
+// ── 적 스폰 헬퍼 ──────────────────────────────────────────────────────
+function trySpawnEnemy(px, py, pw, score, enemies) {
+  const chance = Math.min(0.06 + score * 0.0018, 0.55)
+  if (Math.random() > chance || pw < 65) return
+  const spd = Math.min(1 + score * 0.014, 5.5)
+  enemies.push({
+    x: px + pw / 2,
+    y: py,
+    vx: (Math.random() < 0.5 ? 1 : -1) * spd,
+    emoji: ENEMY_EMOJIS[randInt(0, ENEMY_EMOJIS.length - 1)],
+  })
+}
+
 // ── 플랫폼 생성 헬퍼 ─────────────────────────────────────────────────
 function makePlatforms(ds) {
   const platforms = []
+  const enemies = []
   platforms.push({ x: W / 2 - 70, y: H - 50, w: 140, vx: 0, dir: 1 })
 
   let y = H - 50
@@ -39,18 +57,42 @@ function makePlatforms(ds) {
     const x = randInt(5, W - w - 5)
     const moving = Math.random() < ds.movingChance
     platforms.push({ x, y, w, vx: moving ? ds.moveSpd : 0, dir: 1 })
+    // 안전 구간(시작 위) 제외하고 적 스폰
+    if (y < H - 500) trySpawnEnemy(x, y, w, Math.floor(-y / 8), enemies)
   }
-  return { platforms, minY: y }
+  return { platforms, enemies, minY: y }
+}
+
+// ── 죽음 애니메이션 초기화 ────────────────────────────────────────────
+const PARTICLE_EMOJIS = ['💫','⭐','✨','💥','🌟']
+function startDying(s, p) {
+  s.dyingFrame = 0
+  s.dyingP = { x: p.x, screenY: p.y - s.worldTop, vy: -4 }
+  s.dyingParticles = Array.from({ length: 8 }, (_, i) => {
+    const angle = (i / 8) * Math.PI * 2
+    const spd = randInt(3, 6)
+    return {
+      x: p.x, y: p.y - s.worldTop,
+      vx: Math.cos(angle) * spd,
+      vy: Math.sin(angle) * spd - 2,
+      emoji: PARTICLE_EMOJIS[i % PARTICLE_EMOJIS.length],
+      size: randInt(18, 30),
+      life: randInt(22, 38),
+      maxLife: 0,
+    }
+  })
+  for (const pt of s.dyingParticles) pt.maxLife = pt.life
 }
 
 // ── 초기 게임 상태 ───────────────────────────────────────────────────
 function makeInitialState(difficulty) {
   const ds = DIFF_SETTINGS[difficulty.id]
-  const { platforms, minY } = makePlatforms(ds)
+  const { platforms, enemies, minY } = makePlatforms(ds)
 
   return {
     player: { x: W / 2, y: H - 80, vx: 0, vy: 0 },
     platforms,
+    enemies,
     worldTop: 0,
     score: 0,
     nextPlatY: minY,
@@ -83,7 +125,7 @@ export default function PlatformGame({ onBack }) {
 
   // ── idle/gameover 일 때 캔버스 초기 그리기 ────────────────────────
   useEffect(() => {
-    if (phase === 'playing') return
+    if (phase === 'playing' || phase === 'dying') return
     const canvas = canvasRef.current
     if (!canvas) return
     draw(canvas.getContext('2d'), stateRef.current, character)
@@ -91,7 +133,7 @@ export default function PlatformGame({ onBack }) {
 
   // ── 게임 루프 ──────────────────────────────────────────────────────
   useEffect(() => {
-    if (phase !== 'playing') return
+    if (phase !== 'playing' && phase !== 'dying') return
 
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
@@ -102,6 +144,27 @@ export default function PlatformGame({ onBack }) {
       animRef.current = requestAnimationFrame(loop)
 
       const s = stateRef.current
+
+      // ── 죽음 애니메이션 ─────────────────────────────────────────────
+      if (phase === 'dying') {
+        s.dyingFrame++
+        const dp = s.dyingP
+        dp.vy += 0.45
+        dp.screenY += dp.vy
+        for (const pt of s.dyingParticles) {
+          if (pt.life <= 0) continue
+          pt.x += pt.vx; pt.y += pt.vy
+          pt.vy += 0.2
+          pt.life--
+        }
+        drawDying(ctx, s, characterRef.current)
+        if (s.dyingFrame >= 65) {
+          alive = false
+          setPhase('gameover')
+        }
+        return
+      }
+
       const p = s.player
       const ds = s.ds
 
@@ -111,6 +174,13 @@ export default function PlatformGame({ onBack }) {
           pl.x += pl.vx * pl.dir
           if (pl.x < 5 || pl.x + pl.w > W - 5) pl.dir *= -1
         }
+      }
+
+      // 1-b. 적 이동
+      for (const e of s.enemies) {
+        e.x += e.vx
+        if (e.x < ENEMY_HALF_W) { e.x = ENEMY_HALF_W; e.vx *= -1 }
+        if (e.x > W - ENEMY_HALF_W) { e.x = W - ENEMY_HALF_W; e.vx *= -1 }
       }
 
       // 2. 입력 읽기
@@ -156,12 +226,13 @@ export default function PlatformGame({ onBack }) {
       const newScore = Math.max(s.score, Math.floor(-s.worldTop / 8))
       if (newScore !== s.score) { s.score = newScore; setScore(newScore) }
 
-      // 10. 새 발판 생성
+      // 10. 새 발판 생성 + 적 스폰
       while (s.nextPlatY > s.worldTop - H) {
         const w = randInt(ds.platWMin, ds.platWMax)
         const x = randInt(5, W - w - 5)
         const moving = Math.random() < ds.movingChance
         s.platforms.push({ x, y: s.nextPlatY, w, vx: moving ? ds.moveSpd : 0, dir: 1 })
+        trySpawnEnemy(x, s.nextPlatY, w, s.score, s.enemies)
         s.nextPlatY -= randInt(ds.gapY - 15, ds.gapY + 25)
       }
 
@@ -171,14 +242,48 @@ export default function PlatformGame({ onBack }) {
         if (s.platforms[i].y > cullY) s.platforms.splice(i, 1)
       }
 
-      // 12. 게임오버 판정
+      // 11-b. 적-플레이어 충돌
+      {
+        const pBot   = p.y + PLAYER_FEET
+        const pTop   = p.y - PLAYER_SIZE * 0.55
+        const pLeft  = p.x - PLAYER_HALF_W
+        const pRight = p.x + PLAYER_HALF_W
+        for (let i = s.enemies.length - 1; i >= 0; i--) {
+          const e = s.enemies[i]
+          const eTop  = e.y - ENEMY_SIZE
+          const eLeft  = e.x - ENEMY_HALF_W
+          const eRight = e.x + ENEMY_HALF_W
+          // 겹침 검사
+          if (pRight <= eLeft || pLeft >= eRight) continue
+          if (pBot <= eTop || pTop >= e.y) continue
+          // 밟기: 낙하 중 + 플레이어 발이 적의 위쪽 절반에 닿음
+          if (p.vy > 0 && pBot < e.y - ENEMY_SIZE * 0.35) {
+            s.enemies.splice(i, 1)
+            p.vy = JUMP_VY * 0.75  // 튀어오름
+          } else {
+            // 옆·아래 충돌 → 죽음 애니메이션
+            alive = false
+            gameOverAtRef.current = Date.now()
+            if (saveBest(GAME_ID, difficulty.id, s.score)) setBest(s.score)
+            startDying(s, p)
+            setPhase('dying')
+            return
+          }
+        }
+      }
+
+      // 11-c. 화면 밖 적 제거
+      for (let i = s.enemies.length - 1; i >= 0; i--) {
+        if (s.enemies[i].y > cullY) s.enemies.splice(i, 1)
+      }
+
+      // 12. 낙사 → 죽음 애니메이션
       if (p.y - s.worldTop > H + 60) {
         alive = false
         gameOverAtRef.current = Date.now()
-        if (saveBest(GAME_ID, difficulty.id, s.score)) {
-          setBest(s.score)
-        }
-        setPhase('gameover')
+        if (saveBest(GAME_ID, difficulty.id, s.score)) setBest(s.score)
+        startDying(s, p)
+        setPhase('dying')
         return
       }
 
@@ -360,6 +465,8 @@ export default function PlatformGame({ onBack }) {
               <div style={S.desc}>
                 <p>발판을 밟고 높이높이 올라가요!</p>
                 <p>🟢 고정 발판 &nbsp;·&nbsp; 🔴 움직이는 발판</p>
+                <p>👾 적은 <b>위에서 밟으면</b> 처치, 옆에 닿으면 게임오버!</p>
+                <p>높이 올라갈수록 적이 많아지고 빨라져요!</p>
               </div>
               {charPicker('캐릭터 선택')}
               {diffPicker}
@@ -416,7 +523,7 @@ function getBgGrad(ctx, height) {
   return bgCache.grad
 }
 
-function draw(ctx, s, character) {
+function draw(ctx, s, character, skipPlayer = false) {
   const height = -s.worldTop
 
   // 1. 배경
@@ -448,8 +555,52 @@ function draw(ctx, s, character) {
     ctx.fillRect(p.x + 4, sy + 2, p.w - 8, 3)
   }
 
-  // 4. 플레이어
-  drawEmoji(ctx, character, s.player.x, s.player.y - s.worldTop, PLAYER_SIZE)
+  // 4. 적
+  for (const e of s.enemies) {
+    const sy = e.y - s.worldTop
+    if (sy < -60 || sy > H + 60) continue
+    drawEmoji(ctx, e.emoji, e.x, sy - ENEMY_SIZE * 0.5, ENEMY_SIZE)
+  }
+
+  // 5. 플레이어
+  if (!skipPlayer) drawEmoji(ctx, character, s.player.x, s.player.y - s.worldTop, PLAYER_SIZE)
+}
+
+function drawDying(ctx, s, character) {
+  // 배경 + 발판 + 적은 그대로 (플레이어만 생략)
+  draw(ctx, s, character, true)
+
+  const f = s.dyingFrame
+  const dp = s.dyingP
+
+  // 빨간 플래시 (초반에 강하게, 점점 사라짐)
+  const flash = Math.max(0, 0.55 - f / 65 * 0.55)
+  ctx.fillStyle = `rgba(255,30,30,${flash})`
+  ctx.fillRect(0, 0, W, H)
+
+  // 파티클
+  for (const pt of s.dyingParticles) {
+    if (pt.life <= 0) continue
+    ctx.globalAlpha = pt.life / pt.maxLife
+    ctx.font = `${pt.size}px serif`
+    ctx.textAlign = 'center'
+    ctx.textBaseline = 'middle'
+    ctx.fillText(pt.emoji, pt.x, pt.y)
+  }
+  ctx.globalAlpha = 1
+
+  // 플레이어 — 빙글빙글 + 낙하
+  const rotation = f * 0.22
+  ctx.save()
+  ctx.translate(dp.x, dp.screenY)
+  ctx.rotate(rotation)
+  ctx.globalAlpha = Math.max(0, 1 - f / 65)
+  ctx.font = `${PLAYER_SIZE}px serif`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(character, 0, 0)
+  ctx.restore()
+  ctx.globalAlpha = 1
 }
 
 // ── 스타일 ───────────────────────────────────────────────────────────

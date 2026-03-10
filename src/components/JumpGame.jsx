@@ -121,6 +121,7 @@ export default function Game({ onBack }) {
       nextItemInterval: 450 + Math.floor(Math.random() * 250),
       itemPopups: [],
       active: { invincible: 0, triple: 0, double: 0, magnet: 0 },
+      doubleCooldown: 0,
       enemies: [],
       enemyTimer: 0,
       nextEnemyInterval: Math.floor(180 * d.enemyMult),
@@ -220,11 +221,16 @@ export default function Game({ onBack }) {
         if (s.frame % interval === 0) {
           s.obstacles.push(makeObstacle(pickKind(s.score)))
 
-          // 고득점 시 2연속 장애물
-          if (s.score > diff.doubleScore && Math.random() < diff.doubleChance) {
-            const o2 = makeObstacle(pickKind(s.score))
-            o2.x += 190 + Math.random() * 70
+          // 고득점 시 2연속 장애물 (새·불 제외, 간격 넉넉하게, 쿨다운 적용)
+          if (s.doubleCooldown > 0) {
+            s.doubleCooldown--
+          } else if (s.score > diff.doubleScore && Math.random() < diff.doubleChance) {
+            const simpleKinds = ['rock', 'cactus', 'spike']
+            const k2 = simpleKinds[Math.floor(Math.random() * simpleKinds.length)]
+            const o2 = makeObstacle(k2)
+            o2.x += 260 + Math.random() * 80
             s.obstacles.push(o2)
+            s.doubleCooldown = 3  // 다음 3번 스폰은 단독만
           }
         }
 
@@ -354,11 +360,24 @@ export default function Game({ onBack }) {
         s.enemies = s.enemies.filter((e) => {
           e.frame++
           if (e.kind === 'bat') {
-            e.x -= enemySpd
-            e.y = e.baseY + Math.sin(e.frame * e.freq) * e.amp
+            if (e.dir === 'top') {
+              e.x += e.vx
+              e.y += e.vy
+              // 화면 안에 들어오면 일반 이동으로 전환
+              if (e.y > 0) { e.dir = 'right'; e.baseY = e.y }
+            } else {
+              e.x -= enemySpd
+              e.y = e.baseY + Math.sin(e.frame * e.freq) * e.amp
+            }
           } else if (e.kind === 'ghost') {
-            e.x -= enemySpd * 0.85
-            e.y += (p.y - e.y) * 0.025
+            if (e.dir === 'top') {
+              e.x += (p.x - e.x) * 0.012
+              e.y += 2.2 + (p.y - e.y) * 0.018
+              if (e.y > 0) e.dir = 'right'
+            } else {
+              e.x -= enemySpd * 0.85
+              e.y += (p.y - e.y) * 0.025
+            }
           } else if (e.kind === 'bomb') {
             e.x -= enemySpd * 0.2
             if (e.exploding > 0) { e.exploding--; return e.exploding > 0 }
@@ -366,7 +385,7 @@ export default function Game({ onBack }) {
             e.y += e.vy
             if (e.y + e.h >= GROUND_Y) { e.exploding = 18; e.y = GROUND_Y - e.h }
           }
-          return e.x + e.w > -60
+          return e.x + e.w > -60 && e.y < H + 60
         })
 
         // 적 충돌 (무적 시 스킵)
@@ -713,7 +732,8 @@ function makeObstacle(kind) {
     return { kind, frame: 0, x: W + 10, y: GROUND_Y - h, w: 34, h }
   }
   if (kind === 'bird') {
-    const by = 120 + Math.random() * 110
+    // 낮은 새(230~290): 점프로 쉽게 넘음 / 높은 새(90~140): 아래로 통과 가능
+    const by = Math.random() < 0.5 ? 90 + Math.random() * 50 : 230 + Math.random() * 60
     return { kind, frame: 0, x: W + 10, y: by, w: 56, h: 40 }
   }
   if (kind === 'spike')  return { kind, frame: 0, x: W + 10, y: GROUND_Y - 62, w: 69, h: 62 }
@@ -743,15 +763,25 @@ function pickEnemyKind(score) {
 }
 
 function makeEnemy(kind) {
+  const fromTop = Math.random() < 0.35
   if (kind === 'bat') {
-    const baseY = 100 + Math.random() * 170
-    return { kind, frame: 0, x: W + 10, y: baseY, baseY, amp: 45 + Math.random() * 45, freq: 0.028 + Math.random() * 0.022, w: 50, h: 38 }
+    if (fromTop) {
+      return { kind, dir: 'top', frame: 0, x: 80 + Math.random() * (W - 200), y: -40,
+        vx: -(1 + Math.random() * 1.5), vy: 1.8 + Math.random() * 1.2,
+        amp: 30 + Math.random() * 40, freq: 0.025 + Math.random() * 0.025, w: 50, h: 38 }
+    }
+    const baseY = 55 + Math.random() * 250
+    return { kind, dir: 'right', frame: 0, x: W + 10, y: baseY, baseY,
+      amp: 30 + Math.random() * 60, freq: 0.022 + Math.random() * 0.03, w: 50, h: 38 }
   }
   if (kind === 'ghost') {
-    return { kind, frame: 0, x: W + 10, y: 80 + Math.random() * 160, w: 45, h: 45 }
+    if (fromTop) {
+      return { kind, dir: 'top', frame: 0, x: 80 + Math.random() * (W - 200), y: -40, w: 45, h: 45 }
+    }
+    return { kind, dir: 'right', frame: 0, x: W + 10, y: 55 + Math.random() * 230, w: 45, h: 45 }
   }
-  // bomb: 위에서 떨어짐
-  return { kind, frame: 0, x: W * 0.4 + Math.random() * W * 0.45, y: -30, vy: 1.5 + Math.random() * 1.5, w: 42, h: 42, exploding: 0 }
+  // bomb: 위에서 떨어짐 (더 넓은 x 범위)
+  return { kind, frame: 0, x: 80 + Math.random() * (W - 200), y: -30, vy: 1.5 + Math.random() * 2, w: 42, h: 42, exploding: 0 }
 }
 
 function drawEnemy(ctx, e) {
