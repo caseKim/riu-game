@@ -30,7 +30,9 @@
       "Bash(xxd /Users/ace/Dev/riu-game/.claude/rules.md | head -20)",
       "Bash(claude doctor)",
       "Bash(git:*)",
-      "WebSearch"
+      "WebSearch",
+      "Bash(grep:*)",
+      "Bash(npm run:*)"
     ]
   }
 }
