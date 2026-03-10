@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { getBest, saveBest, getSavedDiff, saveDiff, drawEmoji, fillRoundRect, randInt, STYLES } from '../utils/gameUtils'
+import { getBest, saveBest, getSavedDiff, saveDiff, drawEmoji, fillRoundRect, randInt } from '../utils/gameUtils'
 
 // ── 상수 ────────────────────────────────────────────────────────────
 const W = 480
@@ -30,7 +30,6 @@ const DIFF_SETTINGS = {
 // ── 플랫폼 생성 헬퍼 ─────────────────────────────────────────────────
 function makePlatforms(ds) {
   const platforms = []
-  // 첫 발판: 넓고, 고정, 중앙
   platforms.push({ x: W / 2 - 70, y: H - 50, w: 140, vx: 0, dir: 1 })
 
   let y = H - 50
@@ -41,19 +40,13 @@ function makePlatforms(ds) {
     const moving = Math.random() < ds.movingChance
     platforms.push({ x, y, w, vx: moving ? ds.moveSpd : 0, dir: 1 })
   }
-  return platforms
+  return { platforms, minY: y }
 }
 
 // ── 초기 게임 상태 ───────────────────────────────────────────────────
 function makeInitialState(difficulty) {
   const ds = DIFF_SETTINGS[difficulty.id]
-  const platforms = makePlatforms(ds)
-
-  // nextPlatY: world y of topmost generated platform
-  let minY = H - 50
-  for (const p of platforms) {
-    if (p.y < minY) minY = p.y
-  }
+  const { platforms, minY } = makePlatforms(ds)
 
   return {
     player: { x: W / 2, y: H - 80, vx: 0, vy: 0 },
@@ -83,6 +76,8 @@ export default function PlatformGame({ onBack }) {
   const gameOverAtRef = useRef(0)
   const keysRef = useRef({})
   const touchRef = useRef({ left: false, right: false })
+  const characterRef = useRef(character)
+  characterRef.current = character
 
   if (stateRef.current == null) stateRef.current = makeInitialState(difficulty)
 
@@ -136,16 +131,14 @@ export default function PlatformGame({ onBack }) {
       if (p.x < -10) p.x = W + 10
       if (p.x > W + 10) p.x = -10
 
-      // 7. 발판 충돌 (낙하 중에만)
+      // 7. 발판 충돌 (낙하 중에만, 범위 내 플랫폼만 검사)
       if (p.vy > 0) {
         const pFeet = p.y + PLAYER_FEET
+        const checkTop = pFeet - 2
+        const checkBot = pFeet + Math.abs(p.vy) + 2
         for (const pl of s.platforms) {
-          if (
-            pFeet >= pl.y &&
-            pFeet <= pl.y + PLAT_H + Math.abs(p.vy) + 2 &&
-            p.x + PLAYER_HALF_W > pl.x &&
-            p.x - PLAYER_HALF_W < pl.x + pl.w
-          ) {
+          if (pl.y < checkTop || pl.y > checkBot) continue
+          if (p.x + PLAYER_HALF_W > pl.x && p.x - PLAYER_HALF_W < pl.x + pl.w) {
             p.vy = JUMP_VY
             p.y = pl.y - PLAYER_FEET
             break
@@ -161,7 +154,7 @@ export default function PlatformGame({ onBack }) {
 
       // 9. 점수 갱신
       const newScore = Math.max(s.score, Math.floor(-s.worldTop / 8))
-      s.score = newScore
+      if (newScore !== s.score) { s.score = newScore; setScore(newScore) }
 
       // 10. 새 발판 생성
       while (s.nextPlatY > s.worldTop - H) {
@@ -172,8 +165,11 @@ export default function PlatformGame({ onBack }) {
         s.nextPlatY -= randInt(ds.gapY - 15, ds.gapY + 25)
       }
 
-      // 11. 오래된 발판 제거
-      s.platforms = s.platforms.filter(pl => pl.y <= s.worldTop + H + 100)
+      // 11. 오래된 발판 제거 (in-place)
+      const cullY = s.worldTop + H + 100
+      for (let i = s.platforms.length - 1; i >= 0; i--) {
+        if (s.platforms[i].y > cullY) s.platforms.splice(i, 1)
+      }
 
       // 12. 게임오버 판정
       if (p.y - s.worldTop > H + 60) {
@@ -186,8 +182,7 @@ export default function PlatformGame({ onBack }) {
         return
       }
 
-      setScore(s.score)
-      draw(ctx, s, character)
+      draw(ctx, s, characterRef.current)
     }
 
     animRef.current = requestAnimationFrame(loop)
@@ -195,7 +190,7 @@ export default function PlatformGame({ onBack }) {
       alive = false
       cancelAnimationFrame(animRef.current)
     }
-  }, [phase, difficulty, character])
+  }, [phase, difficulty])
 
   // ── 재시작 ────────────────────────────────────────────────────────
   function startGame() {
@@ -402,36 +397,45 @@ export default function PlatformGame({ onBack }) {
 
 // ── 그리기 (컴포넌트 밖) ─────────────────────────────────────────────
 
+// 배경 그라디언트 캐시 (임계값 변경 시에만 재생성)
+const bgCache = { ctx: null, level: -1, grad: null }
+const BG_STOPS = [
+  ['#87CEEB', '#B0E2FF'],
+  ['#FF8C69', '#FFB347'],
+  ['#0a0a2e', '#1a1a4e'],
+]
+
+function getBgGrad(ctx, height) {
+  const level = height < 1000 ? 0 : height < 3000 ? 1 : 2
+  if (bgCache.ctx !== ctx || bgCache.level !== level) {
+    const grad = ctx.createLinearGradient(0, 0, 0, H)
+    grad.addColorStop(0, BG_STOPS[level][0])
+    grad.addColorStop(1, BG_STOPS[level][1])
+    bgCache.ctx = ctx; bgCache.level = level; bgCache.grad = grad
+  }
+  return bgCache.grad
+}
+
 function draw(ctx, s, character) {
   const height = -s.worldTop
 
-  // 1. 배경 그라디언트
-  const grad = ctx.createLinearGradient(0, 0, 0, H)
-  if (height < 1000) {
-    grad.addColorStop(0, '#87CEEB')
-    grad.addColorStop(1, '#B0E2FF')
-  } else if (height < 3000) {
-    grad.addColorStop(0, '#FF8C69')
-    grad.addColorStop(1, '#FFB347')
-  } else {
-    grad.addColorStop(0, '#0a0a2e')
-    grad.addColorStop(1, '#1a1a4e')
-  }
-  ctx.fillStyle = grad
+  // 1. 배경
+  ctx.fillStyle = getBgGrad(ctx, height)
   ctx.fillRect(0, 0, W, H)
 
-  // 2. 별 (밤)
+  // 2. 별 (밤) — 단일 fill로 배치
   if (height >= 3000) {
     const seed = Math.floor(s.worldTop / 100)
     ctx.fillStyle = 'rgba(255,255,255,0.8)'
+    ctx.beginPath()
     for (let i = 0; i < 30; i++) {
       const sx = (((seed * 1013 + i * 317) % 470) + 470) % 470 + 5
       const sy = (((seed * 571  + i * 137) % 680) + 680) % 680 + 5
       const sr = (((i * 73 + seed) % 3) + 3) % 3 * 0.5 + 0.5
-      ctx.beginPath()
+      ctx.moveTo(sx + sr, sy)
       ctx.arc(sx, sy, sr, 0, Math.PI * 2)
-      ctx.fill()
     }
+    ctx.fill()
   }
 
   // 3. 발판
