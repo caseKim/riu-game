@@ -5,6 +5,7 @@ import SnakeGame from './components/SnakeGame'
 import SpaceGame from './components/SpaceGame'
 import MatchGame from './components/MatchGame'
 import PlatformGame from './components/PlatformGame'
+import FishingGame from './components/FishingGame'
 
 export default function App() {
   const [gameId, setGameId] = useState(null)
@@ -27,6 +28,10 @@ export default function App() {
 
   if (gameId === 'platform') {
     return <PlatformGame onBack={() => setGameId(null)} />
+  }
+
+  if (gameId === 'fishing') {
+    return <FishingGame onBack={() => setGameId(null)} />
   }
 
   return <JumpGame onBack={() => setGameId(null)} />

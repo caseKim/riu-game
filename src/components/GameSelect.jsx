@@ -35,6 +35,13 @@ const GAMES = [
     available: true,
   },
   {
+    id: 'fishing',
+    emoji: '🎣',
+    name: '낚시 게임',
+    desc: '물고기를 낚아보세요!',
+    available: true,
+  },
+  {
     id: 'drawing',
     emoji: '🎨',
     name: '그림 그리기',
