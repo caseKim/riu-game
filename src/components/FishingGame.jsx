@@ -42,6 +42,21 @@ const DIFF_SETTINGS = {
   hard:   { timeLimit: 45, fishCount: 8,  speedMul: 1.6 },
 }
 
+// iOS Safari는 scale(-1,1) + fillText 이모지 조합이 깨짐 → offscreen canvas 캐시로 우회
+const _emojiCache = {}
+function emojiCanvas(emoji, size) {
+  const key = `${emoji}_${size}`
+  if (_emojiCache[key]) return _emojiCache[key]
+  const oc = document.createElement('canvas')
+  oc.width = size * 2; oc.height = size * 2
+  const c = oc.getContext('2d')
+  c.font = `${size}px serif`
+  c.textAlign = 'center'
+  c.textBaseline = 'middle'
+  c.fillText(emoji, size, size)
+  return (_emojiCache[key] = oc)
+}
+
 function pickType() {
   let r = Math.random(), cum = 0
   for (const t of FISH_TYPES) { cum += t.rate; if (r < cum) return t }
@@ -409,16 +424,17 @@ function draw(ctx, s) {
     ctx.beginPath(); ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2); ctx.stroke()
   }
 
-  // 물고기
+  // 물고기 (iOS Safari: scale+fillText 버그 → offscreen drawImage)
   for (const f of s.fish) {
+    const oc = emojiCanvas(f.emoji, f.sz)
     if (f.vx < 0) {
       ctx.save()
       ctx.translate(f.x, f.y)
       ctx.scale(-1, 1)
-      drawEmoji(ctx, f.emoji, 0, 0, f.sz)
+      ctx.drawImage(oc, -f.sz, -f.sz, f.sz * 2, f.sz * 2)
       ctx.restore()
     } else {
-      drawEmoji(ctx, f.emoji, f.x, f.y, f.sz)
+      ctx.drawImage(oc, f.x - f.sz, f.y - f.sz, f.sz * 2, f.sz * 2)
     }
   }
 
