@@ -43,7 +43,8 @@ App
  ├── JumpGame            (gameId === 'jump')
  ├── SnakeGame           (gameId === 'snake')
  ├── SpaceGame           (gameId === 'space')
- └── MatchGame           (gameId === 'match')
+ ├── MatchGame           (gameId === 'match')
+ └── PlatformGame        (gameId === 'platform')
 ```
 
 ### Adding a new game
@@ -197,3 +198,66 @@ Best scores: `localStorage` keys `snake_best_easy`, `snake_best_normal`, `snake_
 
 - Color: `localStorage` key `snake_color`
 - Difficulty: `localStorage` key `snake_diff`
+
+---
+
+## PlatformGame.jsx
+
+### Overview
+
+Portrait canvas (480×700) Doodle Jump-style game. Player auto-bounces on platforms and climbs upward. Camera follows player. 12 selectable characters, 20 AI-free.
+
+### Key constants
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `W / H` | 480 / 700 | Canvas dimensions (portrait) |
+| `GRAVITY` | 0.38 | Downward acceleration per frame |
+| `JUMP_VY` | -13 | Vertical velocity on platform bounce |
+| `PLAT_H` | 12 | Platform height |
+| `PLAYER_FEET` | 14 | Feet offset from center (collision) |
+| `CAM_THRESH` | H×0.38 | Camera scrolls when player above this screen Y |
+| `MOVE_SPD` | 4.5 | Horizontal move speed |
+
+### State pattern
+
+Same `stateRef` pattern — mutable game state in plain object, `useState` only for `score`, `best`, `phase`.
+
+Key refs: `canvasRef`, `wrapRef`, `stateRef`, `animRef`, `keysRef`, `touchRef`, `characterRef`
+
+`characterRef` keeps character in sync without restarting the game loop (not in `useEffect` deps).
+
+### Platform object shape
+
+`{ x, y, w, vx, dir }` — `vx=0` = static (green), `vx≠0` = moving (red)
+
+### Coordinate system
+
+- World Y increases downward. `worldTop` = world Y at screen top (goes negative as player rises).
+- `screenY = worldY - worldTop`
+- Score = `Math.floor(-worldTop / 8)` (층 단위)
+
+### Controls
+
+- **Desktop**: ← → / A D keys
+- **Mobile**: touch left half → left, touch right half → right
+- Touch handler checks `e.target.closest('button')` before `e.preventDefault()` (both touchstart and touchend) to allow overlay button taps
+
+### Difficulty settings
+
+Each entry: `{ id, label, emoji, color, gapY, platWMin, platWMax, movingChance, moveSpd }`
+Best scores: `localStorage` keys `platform_best_easy`, `platform_best_normal`, `platform_best_hard`
+
+### Player preferences
+
+- Character: `localStorage` key `platform_char`
+- Difficulty: `localStorage` key `platform_diff`
+
+### Background theming
+
+`draw()` switches gradient by height (`-worldTop`):
+- `< 1000` — 낮 (sky blue)
+- `1000–3000` — 노을 (orange)
+- `≥ 3000` — 밤 (dark + stars)
+
+Gradient is cached in `bgCache` module-level object; recreated only when threshold level changes.
