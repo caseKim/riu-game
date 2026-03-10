@@ -461,7 +461,8 @@ function draw(ctx, s) {
 
   // 잡힌 물고기
   if (s.hooked) {
-    drawEmoji(ctx, s.hooked.emoji, ROD_TIP_X, s.hooked.y, s.hooked.sz)
+    const hoc = emojiCanvas(s.hooked.emoji, s.hooked.sz)
+    ctx.drawImage(hoc, ROD_TIP_X - s.hooked.sz, s.hooked.y - s.hooked.sz, s.hooked.sz * 2, s.hooked.sz * 2)
   }
 
   // 낚싯대
