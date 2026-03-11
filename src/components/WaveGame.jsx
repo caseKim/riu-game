@@ -41,9 +41,10 @@ export default function WaveGame({ onBack }) {
   const [difficulty, setDifficulty] = useState(() => getSavedDiff(GAME_ID, DIFFICULTIES))
   const diff = DIFF_SETTINGS[difficulty.id]
 
-  const [phase, setPhase] = useState('idle')
-  const [score, setScore] = useState(0)
-  const [best, setBest] = useState(() => getBest(GAME_ID, difficulty.id))
+  const [phase, setPhase]       = useState('idle')
+  const [countdown, setCountdown] = useState(0)
+  const [score, setScore]       = useState(0)
+  const [best, setBest]         = useState(() => getBest(GAME_ID, difficulty.id))
 
   const canvasRef     = useRef(null)
   const wrapRef       = useRef(null)
@@ -52,6 +53,28 @@ export default function WaveGame({ onBack }) {
   const gameOverAtRef = useRef(0)
 
   if (stateRef.current == null) stateRef.current = makeState(diff)
+
+  // ── 카운트다운 ────────────────────────────────────────────────────
+  useEffect(() => {
+    if (phase !== 'countdown') return
+    // 초기 장면 한 프레임 그리기
+    const canvas = canvasRef.current
+    const ctx = canvas.getContext('2d')
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, H * 0.55)
+    skyGrad.addColorStop(0, '#87ceeb')
+    skyGrad.addColorStop(1, '#b3e5fc')
+    const seaGrad = ctx.createLinearGradient(0, H * 0.55, 0, H)
+    seaGrad.addColorStop(0, '#0288d1')
+    seaGrad.addColorStop(1, '#01579b')
+    draw(ctx, stateRef.current, diff, skyGrad, seaGrad)
+  }, [phase]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (phase !== 'countdown') return
+    if (countdown <= 0) { setPhase('playing'); return }
+    const t = setTimeout(() => setCountdown(c => c - 1), 1000)
+    return () => clearTimeout(t)
+  }, [phase, countdown])
 
   // ── 게임 루프 ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -126,7 +149,8 @@ export default function WaveGame({ onBack }) {
     stateRef.current = makeState(diff)
     setScore(0)
     setBest(getBest(GAME_ID, difficulty.id))
-    setPhase('playing')
+    setCountdown(3)
+    setPhase('countdown')
   }
 
   // ── 난이도 변경 ───────────────────────────────────────────────────
@@ -143,6 +167,7 @@ export default function WaveGame({ onBack }) {
     function onKey(e) {
       if (e.code === 'Space' || e.code === 'ArrowUp') {
         e.preventDefault()
+        if (phase === 'countdown') return
         if (phase !== 'playing') { startGame(); return }
         flap(stateRef.current)
       }
@@ -158,6 +183,7 @@ export default function WaveGame({ onBack }) {
     function onTouch(e) {
       if (e.target.closest('button')) return
       e.preventDefault()
+      if (phase === 'countdown') return
       if (phase !== 'playing') { startGame(); return }
       flap(stateRef.current)
     }
@@ -217,6 +243,12 @@ export default function WaveGame({ onBack }) {
 
         {phase === 'playing' && (
           <div style={S.hudScore}>{score}개</div>
+        )}
+
+        {phase === 'countdown' && (
+          <div style={S.countdownOverlay}>
+            <div style={S.countdownNum}>{countdown}</div>
+          </div>
         )}
 
         {phase === 'idle' && (
@@ -469,6 +501,21 @@ const S = {
     fontSize: 18, fontWeight: 'bold',
     color: '#fff', textShadow: '0 1px 4px #000',
     pointerEvents: 'none',
+  },
+  countdownOverlay: {
+    position: 'absolute',
+    inset: 0,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    pointerEvents: 'none',
+  },
+  countdownNum: {
+    fontSize: 'clamp(80px, 20vw, 120px)',
+    fontWeight: 'bold',
+    color: '#fff',
+    textShadow: '0 4px 24px rgba(0,0,0,0.6)',
+    lineHeight: 1,
   },
   overlay: {
     position: 'fixed',
