@@ -7,6 +7,7 @@ import MatchGame from './components/MatchGame'
 import PlatformGame from './components/PlatformGame'
 import FishingGame from './components/FishingGame'
 import WaveGame from './components/WaveGame'
+import WhackGame from './components/WhackGame'
 
 export default function App() {
   const [gameId, setGameId] = useState(null)
@@ -37,6 +38,10 @@ export default function App() {
 
   if (gameId === 'wave') {
     return <WaveGame onBack={() => setGameId(null)} />
+  }
+
+  if (gameId === 'mole') {
+    return <WhackGame onBack={() => setGameId(null)} />
   }
 
   return <JumpGame onBack={() => setGameId(null)} />

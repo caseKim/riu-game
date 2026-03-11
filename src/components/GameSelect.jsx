@@ -49,6 +49,13 @@ const GAMES = [
     available: true,
   },
   {
+    id: 'mole',
+    emoji: '🐭',
+    name: '두더지 잡기',
+    desc: '두더지를 빠르게 탭해요!',
+    available: true,
+  },
+  {
     id: 'drawing',
     emoji: '🎨',
     name: '그림 그리기',
