@@ -44,7 +44,10 @@ App
  ├── SnakeGame           (gameId === 'snake')
  ├── SpaceGame           (gameId === 'space')
  ├── MatchGame           (gameId === 'match')
- └── PlatformGame        (gameId === 'platform')
+ ├── PlatformGame        (gameId === 'platform')
+ ├── FishingGame         (gameId === 'fishing')
+ ├── WaveGame            (gameId === 'wave')
+ └── WhackGame           (gameId === 'mole')
 ```
 
 ### Adding a new game
@@ -52,7 +55,14 @@ App
 1. Copy `src/components/GameTemplate.jsx` → `src/components/YourGame.jsx`
 2. Fill in the 6 `TODO` comments (GAME_ID, canvas size, DIFF_SETTINGS, update/collision/draw logic)
 3. Add entry to `GAMES` array in `GameSelect.jsx` with `available: true`
-4. Import and add `if (gameId === 'your-id') return <YourGame onBack={...} />` in `App.jsx`
+4. Import and add to the `gameProps` block in `App.jsx`: `else if (gameId === 'your-id') screen = <YourGame {...gameProps} />`
+5. Call `onStart?.()` at the top of `startGame()` in your game component
+
+### Game component interface
+
+All games receive `{ onBack, onStart }` props from App.jsx via `gameProps`:
+- `onBack` — navigate back to game select
+- `onStart` — call at the start of `startGame()` (triggers version check and any future app-level hooks)
 
 ### Shared utilities (`src/utils/gameUtils.js`)
 
