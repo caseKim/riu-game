@@ -32,7 +32,9 @@
       "Bash(git:*)",
       "WebSearch",
       "Bash(grep:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(ls /Users/ace/Dev/riu-game/src/components/*.jsx | xargs -I{} basename {} .jsx)",
+      "Bash(cat > /Users/ace/Dev/riu-game/README.md << 'EOF'\n# 리우 게임 🎮\n\n초등학교 1학년 리우와 함께 만드는 미니게임 모음입니다.\n\n## 게임 목록\n\n| 게임 | 설명 |\n|------|------|\n| 🦘 점프 게임 | 장애물을 피해 달리는 러너 게임 |\n| 🐍 뱀 게임 | 2400×2400 월드에서 AI 뱀들과 경쟁 |\n| 🚀 우주 게임 | 웨이브 방식의 슈팅 게임 |\n| 💎 매치 게임 | 제한 횟수 안에 보석을 맞추는 퍼즐 |\n| 🐸 플랫폼 게임 | Doodle Jump 스타일의 점프 게임 |\n| 🎣 낚시 게임 | 타이밍 맞춰 물고기를 낚는 게임 |\n| 🌊 파도 피하기 | 밀려오는 파도를 피하는 게임 |\n| 🦔 두더지 잡기 | 두더지가 나타나면 빠르게 잡는 게임 |\n\n## 개발\n\n```bash\nnpm run dev      # 개발 서버 \\(http://localhost:5173\\)\nnpm run build    # 프로덕션 빌드\nnpm run preview  # 빌드 결과 미리보기\nnpm run lint     # ESLint 검사\n```\n\n## 기술 스택\n\n- React 19 + Vite\n- 인라인 스타일 \\(CSS 없음\\)\n- canvas API 기반 게임 루프\n- localStorage 점수/설정 저장\n\n## 새 게임 추가 방법\n\n1. `src/components/GameTemplate.jsx` 복사 → `YourGame.jsx`\n2. 6개 TODO 채우기 \\(GAME_ID, 캔버스 크기, 난이도, 업데이트/충돌/그리기 로직\\)\n3. `GameSelect.jsx`의 `GAMES` 배열에 항목 추가 \\(`available: true`\\)\n4. `App.jsx`에 import + `gameId === 'your-id'` 분기 추가\n5. `startGame\\(\\)` 안에 `onStart?.\\(\\)` 호출 포함 \\(버전 체크 연동\\)\nEOF)"
     ]
   }
 }
