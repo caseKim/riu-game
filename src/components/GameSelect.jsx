@@ -42,6 +42,13 @@ const GAMES = [
     available: true,
   },
   {
+    id: 'wave',
+    emoji: '🌊',
+    name: '파도 피하기',
+    desc: '파도 사이를 헤쳐나가요!',
+    available: true,
+  },
+  {
     id: 'drawing',
     emoji: '🎨',
     name: '그림 그리기',
