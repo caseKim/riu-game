@@ -90,10 +90,9 @@ export default function WhackGame({ onBack }) {
         }
       }
 
-      const prevScore = s.score
       updateMoles(s)
       spawnMoles(s)
-      if (s.score !== prevScore) setScore(s.score)
+      setScore(s.score)
       draw(ctx, s)
     }
 
