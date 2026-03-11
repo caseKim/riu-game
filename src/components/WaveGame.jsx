@@ -7,7 +7,7 @@ const H = 450
 const GAME_ID = 'wave'
 const PLAYER_X = 130
 const PLAYER_R = 18    // 충돌 반경
-const WALL_W = 60      // 파도 벽 너비
+const WALL_W = 44      // 파도 벽 너비
 const GRAVITY = 0.38
 const FLAP = -9
 
@@ -398,8 +398,8 @@ const S = {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
+    justifyContent: 'center',
     padding: 'clamp(8px, 2vw, 16px)',
-    paddingTop: 'max(clamp(8px, 2vw, 16px), env(safe-area-inset-top))',
     boxSizing: 'border-box',
   },
   topBar: {
