@@ -15,7 +15,10 @@ export default function App() {
   const [gameId, setGameId] = useState(null)
   const [hasUpdate, setHasUpdate] = useState(false)
 
-  useEffect(() => { initVersionCheck(() => setHasUpdate(true)) }, [])
+  useEffect(() => {
+    initVersionCheck(() => setHasUpdate(true))
+    checkVersion()
+  }, [])
 
   const updateBanner = hasUpdate ? (
     <div

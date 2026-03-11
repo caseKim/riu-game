@@ -1,36 +1,40 @@
-# 리우의 게임방
+# 리우 게임 🎮
 
-리우와 함께 만드는 미니게임 모음입니다.
+초등학교 1학년 리우와 함께 만드는 미니게임 모음입니다.
 
 ## 게임 목록
 
 | 게임 | 설명 |
 |------|------|
-| 🏃 점프 게임 | 장애물을 피해 달리기, 과일 먹기 |
-| 🐍 뱀 게임 | AI 뱀을 잡아먹고 성장하기 |
-| 🚀 우주 슈팅 | 웨이브·보스를 물리치는 슈팅 |
-| 💎 보석 맞추기 | 3개 이상 같은 보석 맞추기 |
-| 🐸 플랫폼 점프 | 발판을 밟고 높이 올라가기 (Doodle Jump 스타일) |
+| 🦘 점프 게임 | 장애물을 피해 달리는 러너 게임 |
+| 🐍 뱀 게임 | 2400×2400 월드에서 AI 뱀들과 경쟁 |
+| 🚀 우주 게임 | 웨이브 방식의 슈팅 게임 |
+| 💎 매치 게임 | 제한 횟수 안에 보석을 맞추는 퍼즐 |
+| 🐸 플랫폼 게임 | Doodle Jump 스타일의 점프 게임 |
+| 🎣 낚시 게임 | 타이밍 맞춰 물고기를 낚는 게임 |
+| 🌊 파도 피하기 | 밀려오는 파도를 피하는 게임 |
+| 🦔 두더지 잡기 | 두더지가 나타나면 빠르게 잡는 게임 |
 
 ## 개발
 
 ```bash
-npm install
-npm run dev      # http://localhost:5173
-npm run build
-npm run lint
+npm run dev      # 개발 서버 (http://localhost:5173)
+npm run build    # 프로덕션 빌드
+npm run preview  # 빌드 결과 미리보기
+npm run lint     # ESLint 검사
 ```
-
-## 새 게임 추가하기
-
-1. `src/components/GameSelect.jsx` — `GAMES` 배열에 항목 추가 (`available: true`)
-2. `src/components/YourGame.jsx` — `{ onBack }` prop을 받는 컴포넌트 작성
-3. `src/App.jsx` — import 후 `if (gameId === 'your-id')` 분기 추가
 
 ## 기술 스택
 
-- React + Vite
-- 전체 인라인 스타일 (CSS 모듈·Tailwind 없음)
-- 라우터 없음 — `App.jsx`의 `gameId` state로 화면 전환
-- 게임 루프: `requestAnimationFrame` + `stateRef` (리렌더링 최소화)
-- 최고점수: `localStorage` 저장
+- React 19 + Vite
+- 인라인 스타일 (CSS 없음)
+- canvas API 기반 게임 루프
+- localStorage 점수/설정 저장
+
+## 새 게임 추가 방법
+
+1. `src/components/GameTemplate.jsx` 복사 → `YourGame.jsx`
+2. 6개 TODO 채우기 (GAME_ID, 캔버스 크기, 난이도, 업데이트/충돌/그리기 로직)
+3. `GameSelect.jsx`의 `GAMES` 배열에 항목 추가 (`available: true`)
+4. `App.jsx`에 import + `gameId === 'your-id'` 분기 추가
+5. `startGame()` 안에 `onStart?.()` 호출 포함 (버전 체크 연동)
