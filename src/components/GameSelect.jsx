@@ -124,14 +124,14 @@ const s = {
   },
   grid: {
     display: 'grid',
-    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-    gap: 'clamp(12px, 3vw, 20px)',
+    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+    gap: 'clamp(8px, 2vw, 14px)',
     width: '100%',
-    maxWidth: 480,
+    maxWidth: 600,
   },
   card: {
     position: 'relative',
-    padding: 'clamp(20px, 5vw, 32px) clamp(12px, 3vw, 20px)',
+    padding: 'clamp(14px, 3.5vw, 24px) clamp(8px, 2vw, 14px)',
     background: '#1e1e2e',
     border: '2px solid #333',
     borderRadius: 18,
@@ -163,7 +163,7 @@ const s = {
     fontWeight: 'bold',
   },
   cardEmoji: {
-    fontSize: 'clamp(40px, 10vw, 60px)',
+    fontSize: 'clamp(30px, 7vw, 44px)',
     lineHeight: 1,
   },
   cardName: {
