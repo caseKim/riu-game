@@ -47,7 +47,7 @@ function makeState(diff) {
   }
 }
 
-export default function WhackGame({ onBack }) {
+export default function WhackGame({ onBack, onStart }) {
   const [difficulty, setDifficulty] = useState(() => getSavedDiff(GAME_ID, DIFFICULTIES))
   const diff = DIFF_SETTINGS[difficulty.id]
 
@@ -102,6 +102,7 @@ export default function WhackGame({ onBack }) {
 
   function startGame() {
     if (Date.now() - gameOverAtRef.current < 800) return
+    onStart?.()
     stateRef.current = makeState(diff)
     setScore(0)
     setBest(getBest(GAME_ID, difficulty.id))

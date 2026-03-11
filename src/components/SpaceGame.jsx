@@ -243,7 +243,7 @@ function makeInitialState(diff) {
 }
 
 // ── 컴포넌트 ─────────────────────────────────────────────────────────
-export default function SpaceGame({ onBack }) {
+export default function SpaceGame({ onBack, onStart }) {
   const canvasRef   = useRef(null)
   const wrapRef     = useRef(null)
   const stateRef    = useRef(null)
@@ -271,10 +271,11 @@ export default function SpaceGame({ onBack }) {
   }
 
   const startGame = useCallback(() => {
+    onStart?.()
     stateRef.current = makeInitialState(difficulty)
     setScore(0); setLives(3); setWave(1)
     setPhase('playing')
-  }, [difficulty])
+  }, [difficulty, onStart])
 
   // ── 키보드 ──────────────────────────────────────────────────────
   useEffect(() => {

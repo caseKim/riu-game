@@ -121,7 +121,7 @@ function initState(diff) {
   }
 }
 
-export default function FishingGame({ onBack }) {
+export default function FishingGame({ onBack, onStart }) {
   const [difficulty, setDifficulty] = useState(() => getSavedDiff(GAME_ID, DIFFICULTIES))
   const diff = DIFF_SETTINGS[difficulty.id]
 
@@ -222,6 +222,7 @@ export default function FishingGame({ onBack }) {
 
   function startGame() {
     if (Date.now() - gameOverAtRef.current < 800) return
+    onStart?.()
     stateRef.current = initState(diff)
     holdRef.current = false
     setScore(0)

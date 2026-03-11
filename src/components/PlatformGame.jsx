@@ -81,7 +81,7 @@ function makeInitialState(difficulty) {
 const CHARACTERS = ['🐸','🐰','🐱','🐶','🦊','🐼','🐧','🐯','🦁','🐥','🦄','🤖']
 
 // ── 메인 컴포넌트 ────────────────────────────────────────────────────
-export default function PlatformGame({ onBack }) {
+export default function PlatformGame({ onBack, onStart }) {
   const [difficulty, setDifficulty] = useState(() => getSavedDiff(GAME_ID, DIFFICULTIES))
   const [character, setCharacter] = useState(() => localStorage.getItem(`${GAME_ID}_char`) || '🐸')
 
@@ -235,6 +235,7 @@ export default function PlatformGame({ onBack }) {
   // ── 재시작 ────────────────────────────────────────────────────────
   function startGame() {
     if (Date.now() - gameOverAtRef.current < 800) return
+    onStart?.()
     stateRef.current = makeInitialState(difficulty)
     setScore(0)
     setBest(getBest(GAME_ID, difficulty.id))

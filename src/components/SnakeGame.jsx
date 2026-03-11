@@ -72,7 +72,7 @@ const DIFFICULTIES = [
 ]
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function SnakeGame({ onBack }) {
+export default function SnakeGame({ onBack, onStart }) {
   const canvasRef = useRef(null)
   const wrapRef = useRef(null)
   const stateRef = useRef(null)
@@ -111,12 +111,13 @@ export default function SnakeGame({ onBack }) {
   }
 
   const startGame = useCallback(() => {
+    onStart?.()
     stateRef.current = initState(playerColor, difficulty)
     setScore(0)
     setPlayerLen(INIT_LEN)
     setAliveCount(NUM_AI + 1)
     setPhase('playing')
-  }, [playerColor, difficulty])
+  }, [playerColor, difficulty, onStart])
 
   const pickDifficulty = useCallback((diff) => {
     setDifficulty(diff)

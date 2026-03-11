@@ -167,7 +167,7 @@ function flashAnim(kind) {
   return 'gemPop 0.32s ease-out forwards'  // 'match'
 }
 
-export default function MatchGame({ onBack }) {
+export default function MatchGame({ onBack, onStart }) {
   const [grid, setGrid] = useState(() => makeGrid())
   const [selected, setSelected] = useState(null)
   const [phase, setPhase] = useState('idle')
@@ -190,6 +190,7 @@ export default function MatchGame({ onBack }) {
   const handleTapRef = useRef(null) // always-current tap fn (used by touch handler)
 
   function startGame() {
+    onStart?.()
     busyRef.current = false
     scoreRef.current = 0
     movesRef.current = MAX_MOVES

@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { initVersionCheck, checkVersion } from './useVersionCheck'
+import { COLORS } from './utils/gameUtils'
 import GameSelect from './components/GameSelect'
 import JumpGame from './components/JumpGame'
 import SnakeGame from './components/SnakeGame'
@@ -11,38 +13,37 @@ import WhackGame from './components/WhackGame'
 
 export default function App() {
   const [gameId, setGameId] = useState(null)
+  const [hasUpdate, setHasUpdate] = useState(false)
 
-  if (!gameId) {
-    return <GameSelect onSelect={setGameId} />
-  }
+  useEffect(() => { initVersionCheck(() => setHasUpdate(true)) }, [])
 
-  if (gameId === 'snake') {
-    return <SnakeGame onBack={() => setGameId(null)} />
-  }
+  const updateBanner = hasUpdate ? (
+    <div
+      onClick={() => location.reload()}
+      style={{
+        position: 'fixed', top: 0, left: 0, right: 0, zIndex: 9999,
+        background: COLORS.gold, color: COLORS.bg,
+        textAlign: 'center', padding: '10px',
+        fontWeight: 'bold', fontSize: '15px', cursor: 'pointer',
+      }}
+    >
+      🆕 새 버전이 있어요! 탭해서 업데이트
+    </div>
+  ) : null
 
-  if (gameId === 'space') {
-    return <SpaceGame onBack={() => setGameId(null)} />
-  }
+  const back = useCallback(() => { checkVersion(); setGameId(null) }, [])
+  const select = useCallback((id) => { checkVersion(); setGameId(id) }, [])
+  const gameProps = { onBack: back, onStart: checkVersion }
+  let screen
+  if (!gameId)              screen = <GameSelect onSelect={select} />
+  else if (gameId === 'snake')    screen = <SnakeGame {...gameProps} />
+  else if (gameId === 'space')    screen = <SpaceGame {...gameProps} />
+  else if (gameId === 'match')    screen = <MatchGame {...gameProps} />
+  else if (gameId === 'platform') screen = <PlatformGame {...gameProps} />
+  else if (gameId === 'fishing')  screen = <FishingGame {...gameProps} />
+  else if (gameId === 'wave')     screen = <WaveGame {...gameProps} />
+  else if (gameId === 'mole')     screen = <WhackGame {...gameProps} />
+  else                            screen = <JumpGame {...gameProps} />
 
-  if (gameId === 'match') {
-    return <MatchGame onBack={() => setGameId(null)} />
-  }
-
-  if (gameId === 'platform') {
-    return <PlatformGame onBack={() => setGameId(null)} />
-  }
-
-  if (gameId === 'fishing') {
-    return <FishingGame onBack={() => setGameId(null)} />
-  }
-
-  if (gameId === 'wave') {
-    return <WaveGame onBack={() => setGameId(null)} />
-  }
-
-  if (gameId === 'mole') {
-    return <WhackGame onBack={() => setGameId(null)} />
-  }
-
-  return <JumpGame onBack={() => setGameId(null)} />
+  return <>{updateBanner}{screen}</>
 }

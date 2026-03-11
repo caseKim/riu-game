@@ -73,7 +73,7 @@ const DIFF_SETTINGS = {
   hard:   { baseSpeed: 8, intervalMax: 75,  intervalMin: 28, doubleScore: 15,   doubleChance: 0.45, maxSpeed: 18, enemyMult: 0.65 },
 }
 
-export default function Game({ onBack }) {
+export default function Game({ onBack, onStart }) {
   const [character, setCharacter] = useState(getSavedCharacter)
   const [difficulty, setDifficulty] = useState(getSavedDifficulty)
   const [tab, setTab] = useState('animals')
@@ -142,19 +142,21 @@ export default function Game({ onBack }) {
   }, [phase])
 
   const startGame = useCallback(() => {
+    onStart?.()
     const d = DIFF_SETTINGS[difficulty.id]
     stateRef.current = makeInitialState(d)
     setScore(0)
     setBest(getBest(difficulty.id))
     setPhase('playing')
-  }, [difficulty])
+  }, [difficulty, onStart])
 
   const restart = useCallback(() => {
+    onStart?.()
     const d = DIFF_SETTINGS[difficulty.id]
     stateRef.current = makeInitialState(d)
     setScore(0)
     setPhase('playing')
-  }, [difficulty])
+  }, [difficulty, onStart])
 
   useEffect(() => {
     const onKey = (e) => {

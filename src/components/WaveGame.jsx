@@ -37,7 +37,7 @@ function makeState(diff) {
 }
 
 // ── 메인 컴포넌트 ────────────────────────────────────────────────────
-export default function WaveGame({ onBack }) {
+export default function WaveGame({ onBack, onStart }) {
   const [difficulty, setDifficulty] = useState(() => getSavedDiff(GAME_ID, DIFFICULTIES))
   const diff = DIFF_SETTINGS[difficulty.id]
 
@@ -146,6 +146,7 @@ export default function WaveGame({ onBack }) {
   // ── 재시작 ────────────────────────────────────────────────────────
   function startGame() {
     if (Date.now() - gameOverAtRef.current < 800) return
+    onStart?.()
     stateRef.current = makeState(diff)
     setScore(0)
     setBest(getBest(GAME_ID, difficulty.id))
