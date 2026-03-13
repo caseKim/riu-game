@@ -110,11 +110,11 @@ function drawCard(ctx, x, y, type, blocked, w = CW, h = CH, pulse = 0) {
   rrPathFixed(ctx, x - w / 2, y - h / 2, w, h, CR)
   ctx.stroke()
   ctx.globalAlpha = blocked ? 0.65 : 1
-  ctx.font = `${w * 0.68}px serif`
+  ctx.font = `${w * 0.7}px serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.fillStyle = '#000'
-  ctx.fillText(type, x, y + h * 0.08)
+  ctx.fillText(type, x, y + h * 0.05)
   ctx.restore()
 }
 
