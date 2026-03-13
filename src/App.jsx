@@ -11,6 +11,7 @@ import FishingGame from './components/FishingGame'
 import WaveGame from './components/WaveGame'
 import WhackGame from './components/WhackGame'
 import MazeGame from './components/MazeGame'
+import TripleGame from './components/TripleGame'
 
 export default function App() {
   const [gameId, setGameId] = useState(null)
@@ -48,6 +49,7 @@ export default function App() {
   else if (gameId === 'wave')     screen = <WaveGame {...gameProps} />
   else if (gameId === 'mole')     screen = <WhackGame {...gameProps} />
   else if (gameId === 'maze')     screen = <MazeGame {...gameProps} />
+  else if (gameId === 'triple')   screen = <TripleGame {...gameProps} />
   else                            screen = <JumpGame {...gameProps} />
 
   return <>{updateBanner}{screen}</>

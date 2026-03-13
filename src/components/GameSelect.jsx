@@ -63,6 +63,13 @@ const GAMES = [
     available: true,
   },
   {
+    id: 'triple',
+    emoji: '🃏',
+    name: '세 장 모으기',
+    desc: '같은 카드 3장을 모아요!',
+    available: true,
+  },
+  {
     id: 'drawing',
     emoji: '🎨',
     name: '그림 그리기',
