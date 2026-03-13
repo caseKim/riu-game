@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { getSavedDiff, saveDiff } from '../utils/gameUtils'
+import { getSavedDiff, saveDiff, dist } from '../utils/gameUtils'
 
 // 점수제 시절 잘못된 기록 정리 (3초 이하는 무효)
 ;['easy','normal','hard','vhard','extreme'].forEach(id => {
@@ -24,6 +24,8 @@ function saveBestTime(diffId, ms) {
 function fmtTime(ms) {
   return ms > 0 ? `${(ms / 1000).toFixed(1)}초` : '-'
 }
+
+const IS_TOUCH = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0)
 
 const W = 640
 const H = 720
@@ -115,6 +117,10 @@ export default function MazeGame({ onBack, onStart }) {
   const difficultyRef  = useRef(difficulty)
   const startGameRef   = useRef(null)
   const keysRef        = useRef({ dx: 0, dy: 0, heldSince: 0 })
+  const wrapRef        = useRef(null)
+  const joyRef         = useRef({ active: false, cx: 0, cy: 0, dx: 0, dy: 0 })
+  const joyKnobRef     = useRef(null)
+  const joyContainerRef = useRef(null)
 
   difficultyRef.current = difficulty
 
@@ -166,6 +172,22 @@ export default function MazeGame({ onBack, onStart }) {
       const now = Date.now()
       s.elapsed = s.startTime > 0 ? now - s.startTime : 0
 
+      // 조이스틱 방향 → keysRef 업데이트
+      const joy = joyRef.current
+      if (joy.active) {
+        const adx = Math.abs(joy.dx), ady = Math.abs(joy.dy)
+        let jdx = 0, jdy = 0
+        if (adx > 12 || ady > 12) {
+          if (adx > ady) jdx = joy.dx > 0 ? 1 : -1
+          else jdy = joy.dy > 0 ? 1 : -1
+        }
+        const cur = keysRef.current
+        if (jdx !== cur.dx || jdy !== cur.dy) {
+          keysRef.current = { dx: jdx, dy: jdy, heldSince: now }
+          if (jdx !== 0 || jdy !== 0) { movePlayer(jdx, jdy); s.lastMoveAt = now }
+        }
+      }
+
       // 키 홀드 자동 반복
       const k = keysRef.current
       if (k.dx !== 0 || k.dy !== 0) {
@@ -206,31 +228,63 @@ export default function MazeGame({ onBack, onStart }) {
     setPhase('idle')
   }
 
-  // ── 스와이프 ──────────────────────────────────────────────────────
+  // ── 조이스틱 (터치) ────────────────────────────────────────────────
   useEffect(() => {
-    const el = canvasRef.current
-    if (!el) return
-    let startX = 0, startY = 0
+    if (!IS_TOUCH) return
+    const wrap = wrapRef.current
+    if (!wrap) return
+
     function onTouchStart(e) {
-      startX = e.touches[0].clientX
-      startY = e.touches[0].clientY
+      if (e.target.closest('button')) return
       e.preventDefault()
+      const touch = e.changedTouches[0]
+      const cx = touch.clientX, cy = touch.clientY
+      joyRef.current = { active: true, cx, cy, dx: 0, dy: 0 }
+      const container = joyContainerRef.current
+      if (container) {
+        container.style.left = `${cx - 65}px`
+        container.style.top  = `${cy - 65}px`
+        container.style.display = 'flex'
+      }
+      if (phaseRef.current !== 'playing') startGameRef.current()
     }
-    function onTouchEnd(e) {
-      if (phaseRef.current !== 'playing') return
-      const dx = e.changedTouches[0].clientX - startX
-      const dy = e.changedTouches[0].clientY - startY
-      if (Math.abs(dx) < 15 && Math.abs(dy) < 15) return
-      if (Math.abs(dx) > Math.abs(dy)) movePlayer(dx > 0 ? 1 : -1, 0)
-      else                             movePlayer(0, dy > 0 ? 1 : -1)
+
+    function onTouchMove(e) {
+      e.preventDefault()
+      const joy = joyRef.current
+      if (!joy.active) return
+      const touch = e.changedTouches[0]
+      const rawDx = touch.clientX - joy.cx
+      const rawDy = touch.clientY - joy.cy
+      const maxR = 44
+      const d = dist(0, 0, rawDx, rawDy)
+      joy.dx = d > maxR ? rawDx / d * maxR : rawDx
+      joy.dy = d > maxR ? rawDy / d * maxR : rawDy
+      if (joyKnobRef.current) {
+        joyKnobRef.current.style.transform = `translate(${joy.dx}px, ${joy.dy}px)`
+      }
     }
-    el.addEventListener('touchstart', onTouchStart, { passive: false })
-    el.addEventListener('touchend', onTouchEnd, { passive: true })
+
+    function onTouchEnd() {
+      joyRef.current.active = false
+      joyRef.current.dx = 0
+      joyRef.current.dy = 0
+      keysRef.current = { dx: 0, dy: 0, heldSince: 0 }
+      if (joyKnobRef.current) joyKnobRef.current.style.transform = 'translate(0px, 0px)'
+      if (joyContainerRef.current) joyContainerRef.current.style.display = 'none'
+    }
+
+    wrap.addEventListener('touchstart', onTouchStart, { passive: false })
+    wrap.addEventListener('touchmove', onTouchMove, { passive: false })
+    wrap.addEventListener('touchend', onTouchEnd)
+    wrap.addEventListener('touchcancel', onTouchEnd)
     return () => {
-      el.removeEventListener('touchstart', onTouchStart)
-      el.removeEventListener('touchend', onTouchEnd)
+      wrap.removeEventListener('touchstart', onTouchStart)
+      wrap.removeEventListener('touchmove', onTouchMove)
+      wrap.removeEventListener('touchend', onTouchEnd)
+      wrap.removeEventListener('touchcancel', onTouchEnd)
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [])
 
   // ── 키보드 ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -301,8 +355,16 @@ export default function MazeGame({ onBack, onStart }) {
       <h1 style={S.title}>🌀 미로 탈출</h1>
       <p style={S.subtitle}>{difficulty.emoji} {difficulty.label} · 빠를수록 좋아요!</p>
 
-      <div style={S.gameArea}>
+      <div ref={wrapRef} style={S.gameArea}>
         <canvas ref={canvasRef} width={W} height={H} style={S.canvas} />
+
+        {IS_TOUCH && (
+          <div ref={joyContainerRef} style={S.joyContainer}>
+            <div style={S.joyBase}>
+              <div ref={joyKnobRef} style={S.joyKnob} />
+            </div>
+          </div>
+        )}
 
         <div style={S.scoreCard}>
           <div style={S.scoreRow}>
@@ -388,7 +450,7 @@ function draw(ctx, s) {
       const isExit = c === cols - 1 && r === rows - 1
       const isPlayer = c === px && r === py
       if (!isExit && !isPlayer && trail[r][c]) {
-        ctx.fillStyle = '#4a9eff0d'
+        ctx.fillStyle = '#4a9eff35'
         ctx.fillRect(x + 1, y + 1, cellSize - 2, cellSize - 2)
       }
     }
@@ -477,4 +539,7 @@ const S = {
   btnGroup:  { display: 'flex', flexDirection: 'column', gap: 8, width: '100%' },
   btnPrimary: { background: 'linear-gradient(135deg, #FFD700, #FFA500)', color: '#1a1a2e', border: 'none', borderRadius: 14, padding: 'clamp(10px, 2vw, 14px) clamp(20px, 4vw, 36px)', fontSize: 'clamp(15px, 3vw, 18px)', fontWeight: 'bold', cursor: 'pointer', boxShadow: '0 4px 20px rgba(255,165,0,0.4)' },
   btnBack2:   { background: 'transparent', color: '#aaa', border: '2px solid #444', borderRadius: 14, padding: 'clamp(8px, 1.5vw, 10px) clamp(16px, 3vw, 24px)', fontSize: 'clamp(13px, 2.5vw, 15px)', fontWeight: 'bold', cursor: 'pointer' },
+  joyContainer: { position: 'fixed', display: 'none', alignItems: 'center', justifyContent: 'center', width: 130, height: 130, pointerEvents: 'none', zIndex: 50 },
+  joyBase: { width: 130, height: 130, borderRadius: '50%', background: 'rgba(255,255,255,0.07)', border: '2px solid rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  joyKnob: { width: 54, height: 54, borderRadius: '50%', background: 'rgba(255,255,255,0.38)', border: '2px solid rgba(255,255,255,0.55)', pointerEvents: 'none', willChange: 'transform' },
 }
