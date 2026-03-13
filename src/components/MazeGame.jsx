@@ -1,5 +1,29 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { getBest, saveBest, getSavedDiff, saveDiff } from '../utils/gameUtils'
+import { getSavedDiff, saveDiff } from '../utils/gameUtils'
+
+// 점수제 시절 잘못된 기록 정리 (3초 이하는 무효)
+;['easy','normal','hard','vhard','extreme'].forEach(id => {
+  const key = `maze_best_${id}`
+  const v = parseFloat(localStorage.getItem(key))
+  if (!isNaN(v) && v <= 3000) localStorage.removeItem(key)
+})
+
+// 시간 기록 (낮을수록 좋음, 0 = 기록 없음)
+function getBestTime(diffId) {
+  const v = parseFloat(localStorage.getItem(`maze_best_${diffId}`))
+  return isNaN(v) ? 0 : v
+}
+function saveBestTime(diffId, ms) {
+  const prev = getBestTime(diffId)
+  if (prev === 0 || ms < prev) {
+    localStorage.setItem(`maze_best_${diffId}`, ms)
+    return true
+  }
+  return false
+}
+function fmtTime(ms) {
+  return ms > 0 ? `${(ms / 1000).toFixed(1)}초` : '-'
+}
 
 const W = 640
 const H = 720
@@ -16,11 +40,11 @@ const DIFFICULTIES = [
 ]
 
 const DIFF_SETTINGS = {
-  easy:    { cols: 9,  rows: 9,  timeLimit: 120_000 },
-  normal:  { cols: 13, rows: 13, timeLimit: 90_000 },
-  hard:    { cols: 19, rows: 19, timeLimit: 60_000 },
-  vhard:   { cols: 25, rows: 25, timeLimit: 50_000 },
-  extreme: { cols: 31, rows: 31, timeLimit: 40_000 },
+  easy:    { cols: 9,  rows: 9  },
+  normal:  { cols: 13, rows: 13 },
+  hard:    { cols: 19, rows: 19 },
+  vhard:   { cols: 25, rows: 25 },
+  extreme: { cols: 31, rows: 31 },
 }
 
 const MOVE_DELAY    = 180  // 홀드 후 자동반복 시작까지 (ms)
@@ -64,7 +88,7 @@ function generateMaze(cols, rows) {
 }
 
 function makeInitialState(diff) {
-  const { cols, rows, timeLimit } = diff
+  const { cols, rows } = diff
   const maze = generateMaze(cols, rows)
   const availW = W - MAZE_PAD * 2
   const availH = H - HUD_H - MAZE_PAD * 2
@@ -73,15 +97,16 @@ function makeInitialState(diff) {
   const offY = HUD_H + Math.floor((H - HUD_H - cellSize * rows) / 2)
   const trail = Array.from({ length: rows }, () => new Array(cols).fill(false))
   trail[0][0] = true
-  return { maze, cols, rows, cellSize, offX, offY, px: 0, py: 0, timeLeft: timeLimit, timeLimit, endTime: 0, score: 0, trail, lastMoveAt: 0 }
+  return { maze, cols, rows, cellSize, offX, offY, px: 0, py: 0, startTime: 0, elapsed: 0, score: 0, trail, lastMoveAt: 0 }
 }
 
 // ── 메인 컴포넌트 ────────────────────────────────────────────────────
 export default function MazeGame({ onBack, onStart }) {
   const [difficulty, setDifficulty] = useState(() => getSavedDiff(GAME_ID, DIFFICULTIES))
-  const [phase, setPhase]   = useState('idle')
-  const [score, setScore]   = useState(0)
-  const [best, setBest]     = useState(() => getBest(GAME_ID, difficulty.id))
+  const [phase, setPhase]       = useState('idle')
+  const [score, setScore]       = useState(0)   // 경과 ms
+  const [best, setBest]         = useState(() => getBestTime(difficulty.id))
+  const [newRecord, setNewRecord] = useState(false)
 
   const canvasRef      = useRef(null)
   const animRef        = useRef(null)
@@ -116,10 +141,12 @@ export default function MazeGame({ onBack, onStart }) {
     s.px = nx; s.py = ny
     s.trail[ny][nx] = true
     if (nx === s.cols - 1 && ny === s.rows - 1) {
-      const sc = Math.round(s.timeLeft / 1000) * 10
-      s.score = sc
-      setScore(sc)
-      if (saveBest(GAME_ID, difficultyRef.current.id, sc)) setBest(sc)
+      const elapsed = Date.now() - s.startTime
+      s.score = elapsed
+      setScore(elapsed)
+      const isNew = saveBestTime(difficultyRef.current.id, elapsed)
+      if (isNew) setBest(elapsed)
+      setNewRecord(isNew)
       phaseRef.current = 'clear'
       setPhase('clear')
     }
@@ -137,7 +164,7 @@ export default function MazeGame({ onBack, onStart }) {
       animRef.current = requestAnimationFrame(loop)
       const s = stateRef.current
       const now = Date.now()
-      s.timeLeft = Math.max(0, s.endTime - now)
+      s.elapsed = s.startTime > 0 ? now - s.startTime : 0
 
       // 키 홀드 자동 반복
       const k = keysRef.current
@@ -148,12 +175,6 @@ export default function MazeGame({ onBack, onStart }) {
         }
       }
 
-      if (s.timeLeft <= 0) {
-        draw(ctx, s)
-        phaseRef.current = 'gameover'
-        setPhase('gameover')
-        return
-      }
       draw(ctx, s)
     }
 
@@ -164,12 +185,12 @@ export default function MazeGame({ onBack, onStart }) {
   // ── 시작 ─────────────────────────────────────────────────────────
   function startGame() {
     onStart?.()
-    const d = DIFF_SETTINGS[difficultyRef.current.id]
-    const s = makeInitialState(d)
-    s.endTime = Date.now() + d.timeLimit
+    const s = makeInitialState(DIFF_SETTINGS[difficultyRef.current.id])
+    s.startTime = Date.now()
     stateRef.current = s
     setScore(0)
-    setBest(getBest(GAME_ID, difficultyRef.current.id))
+    setNewRecord(false)
+    setBest(getBestTime(difficultyRef.current.id))
     phaseRef.current = 'playing'
     setPhase('playing')
   }
@@ -179,21 +200,37 @@ export default function MazeGame({ onBack, onStart }) {
   function changeDiff(d) {
     saveDiff(GAME_ID, d.id)
     setDifficulty(d)
-    setBest(getBest(GAME_ID, d.id))
+    setBest(getBestTime(d.id))
     stateRef.current = makeInitialState(DIFF_SETTINGS[d.id])
     phaseRef.current = 'idle'
     setPhase('idle')
   }
 
-  // ── D-패드 헬퍼 ───────────────────────────────────────────────────
-  function dirDown(dx, dy) {
-    keysRef.current = { dx, dy, heldSince: Date.now() }
-    movePlayer(dx, dy)
-    stateRef.current.lastMoveAt = Date.now()
-  }
-  function dirUp() {
-    keysRef.current = { dx: 0, dy: 0, heldSince: 0 }
-  }
+  // ── 스와이프 ──────────────────────────────────────────────────────
+  useEffect(() => {
+    const el = canvasRef.current
+    if (!el) return
+    let startX = 0, startY = 0
+    function onTouchStart(e) {
+      startX = e.touches[0].clientX
+      startY = e.touches[0].clientY
+      e.preventDefault()
+    }
+    function onTouchEnd(e) {
+      if (phaseRef.current !== 'playing') return
+      const dx = e.changedTouches[0].clientX - startX
+      const dy = e.changedTouches[0].clientY - startY
+      if (Math.abs(dx) < 15 && Math.abs(dy) < 15) return
+      if (Math.abs(dx) > Math.abs(dy)) movePlayer(dx > 0 ? 1 : -1, 0)
+      else                             movePlayer(0, dy > 0 ? 1 : -1)
+    }
+    el.addEventListener('touchstart', onTouchStart, { passive: false })
+    el.addEventListener('touchend', onTouchEnd, { passive: true })
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchend', onTouchEnd)
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── 키보드 ────────────────────────────────────────────────────────
   useEffect(() => {
@@ -233,7 +270,6 @@ export default function MazeGame({ onBack, onStart }) {
     }
   }, [movePlayer])
 
-  const isNewBest = score > 0 && score >= best
 
   const diffPicker = (
     <div>
@@ -263,7 +299,7 @@ export default function MazeGame({ onBack, onStart }) {
         )}
       </div>
       <h1 style={S.title}>🌀 미로 탈출</h1>
-      <p style={S.subtitle}>{difficulty.emoji} {difficulty.label}</p>
+      <p style={S.subtitle}>{difficulty.emoji} {difficulty.label} · 빠를수록 좋아요!</p>
 
       <div style={S.gameArea}>
         <canvas ref={canvasRef} width={W} height={H} style={S.canvas} />
@@ -271,33 +307,17 @@ export default function MazeGame({ onBack, onStart }) {
         <div style={S.scoreCard}>
           <div style={S.scoreRow}>
             <div style={S.scoreItem}>
-              <span style={S.scoreLabel}>점수</span>
-              <span style={S.scoreVal}>{score}점</span>
+              <span style={S.scoreLabel}>기록</span>
+              <span style={S.scoreVal}>{score > 0 ? fmtTime(score) : '-'}</span>
             </div>
             <div style={S.scoreDivider} />
             <div style={S.scoreItem}>
               <span style={S.scoreLabel}>🏆 최고</span>
-              <span style={S.scoreBest}>{best}점</span>
+              <span style={S.scoreBest}>{fmtTime(best)}</span>
             </div>
           </div>
         </div>
 
-        {/* 모바일 D-패드 */}
-        {phase === 'playing' && (
-          <div style={S.dpad}>
-            <div style={S.dpadRow}>
-              <button style={S.dpadBtn} onPointerDown={() => dirDown(0, -1)} onPointerUp={dirUp} onPointerLeave={dirUp}>▲</button>
-            </div>
-            <div style={S.dpadRow}>
-              <button style={S.dpadBtn} onPointerDown={() => dirDown(-1, 0)} onPointerUp={dirUp} onPointerLeave={dirUp}>◀</button>
-              <div style={S.dpadCenter} />
-              <button style={S.dpadBtn} onPointerDown={() => dirDown(1, 0)} onPointerUp={dirUp} onPointerLeave={dirUp}>▶</button>
-            </div>
-            <div style={S.dpadRow}>
-              <button style={S.dpadBtn} onPointerDown={() => dirDown(0, 1)} onPointerUp={dirUp} onPointerLeave={dirUp}>▼</button>
-            </div>
-          </div>
-        )}
 
         {/* 시작 오버레이 */}
         {phase === 'idle' && (
@@ -305,10 +325,10 @@ export default function MazeGame({ onBack, onStart }) {
             <div style={S.box}>
               <div style={S.oTitle}>🌀 미로 탈출</div>
               <div style={S.desc}>
-                <p>🐱 고양이를 출구 🚪까지 안내해요!<br />⏱ 시간이 다 되기 전에 탈출하세요</p>
+                <p>🐱 고양이를 출구 🚪까지 안내해요!<br />⏱ 얼마나 빨리 탈출할 수 있을까요?</p>
               </div>
               {diffPicker}
-              <div style={S.bestLine}>🏆 최고 {best}점</div>
+              <div style={S.bestLine}>🏆 최고 {fmtTime(best)}</div>
               <div style={S.btnGroup}>
                 <button style={S.btnPrimary} onClick={startGame}>시작하기</button>
                 <button style={S.btnBack2} onClick={onBack}>← 게임 선택</button>
@@ -321,11 +341,11 @@ export default function MazeGame({ onBack, onStart }) {
         {phase === 'clear' && (
           <div style={S.overlay}>
             <div style={S.box}>
-              <div style={S.oEmoji}>{isNewBest ? '🏆' : '🎉'}</div>
-              <div style={S.oTitle}>{isNewBest ? '신기록!' : '탈출 성공!'}</div>
-              <div style={S.bigScore}>{score}점</div>
-              <div style={S.bestScore}>최고 {best}점</div>
-              {isNewBest && <div style={S.newBest}>🎉 최고 기록 갱신!</div>}
+              <div style={S.oEmoji}>{newRecord ? '🏆' : '🎉'}</div>
+              <div style={S.oTitle}>{newRecord ? '신기록!' : '탈출 성공!'}</div>
+              <div style={S.bigScore}>{fmtTime(score)}</div>
+              <div style={S.bestScore}>최고 {fmtTime(best)}</div>
+              {newRecord && <div style={S.newBest}>🎉 최고 기록 갱신!</div>}
               {diffPicker}
               <div style={S.btnGroup}>
                 <button style={S.btnPrimary} onClick={startGame}>다시 하기</button>
@@ -335,21 +355,6 @@ export default function MazeGame({ onBack, onStart }) {
           </div>
         )}
 
-        {/* 게임오버 오버레이 */}
-        {phase === 'gameover' && (
-          <div style={S.overlay}>
-            <div style={S.box}>
-              <div style={S.oEmoji}>⏰</div>
-              <div style={S.oTitle}>시간 초과!</div>
-              <div style={S.desc}><p>아깝다! 다시 도전해봐요</p></div>
-              {diffPicker}
-              <div style={S.btnGroup}>
-                <button style={S.btnPrimary} onClick={startGame}>다시 하기</button>
-                <button style={S.btnBack2} onClick={onBack}>← 게임 선택</button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   )
@@ -357,7 +362,7 @@ export default function MazeGame({ onBack, onStart }) {
 
 // ── 그리기 (컴포넌트 밖) ─────────────────────────────────────────────
 function draw(ctx, s) {
-  const { maze, cols, rows, cellSize, offX, offY, px, py, trail, timeLeft, timeLimit } = s
+  const { maze, cols, rows, cellSize, offX, offY, px, py, trail } = s
 
   // 배경
   ctx.fillStyle = '#0f0f1e'
@@ -367,21 +372,10 @@ function draw(ctx, s) {
   ctx.fillStyle = '#111127'
   ctx.fillRect(0, 0, W, HUD_H)
 
-  // 타이머 바 트랙
-  const BAR_X = 16, BAR_Y = 10, BAR_H = 24, BAR_W = W - 32
-  ctx.fillStyle = '#2a2a4a'
-  ctx.fillRect(BAR_X, BAR_Y, BAR_W, BAR_H)
-
-  // 타이머 바 채움
-  const ratio = timeLimit > 0 ? Math.min(1, timeLeft / timeLimit) : 0
-  const barColor = ratio > 0.5 ? '#4CAF50' : ratio > 0.25 ? '#FFD700' : '#F44336'
-  ctx.fillStyle = barColor
-  ctx.fillRect(BAR_X, BAR_Y, Math.floor(BAR_W * ratio), BAR_H)
-
-  // 남은 시간 텍스트
-  const secs = Math.ceil(timeLeft / 1000)
+  // 경과 시간 표시
+  const secs = (s.elapsed / 1000).toFixed(1)
   ctx.fillStyle = '#fff'
-  ctx.font = 'bold 14px "Segoe UI", sans-serif'
+  ctx.font = 'bold 16px "Segoe UI", sans-serif'
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.fillText(`⏱ ${secs}초`, W / 2, HUD_H / 2)
@@ -468,10 +462,6 @@ const S = {
   scoreVal:     { color: '#FFD700', fontWeight: 'bold', fontSize: 'clamp(14px, 3vw, 18px)' },
   scoreBest:    { color: '#aaa', fontWeight: 'bold', fontSize: 'clamp(14px, 3vw, 18px)' },
   scoreDivider: { width: 1, height: 32, background: '#333', margin: '0 8px' },
-  dpad: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, padding: '8px 0 4px' },
-  dpadRow: { display: 'flex', gap: 4, alignItems: 'center', justifyContent: 'center' },
-  dpadBtn: { width: 60, height: 60, fontSize: 22, background: '#1e1e2e', border: '2px solid #444', borderRadius: 12, color: '#aaa', cursor: 'pointer', touchAction: 'none', userSelect: 'none' },
-  dpadCenter: { width: 60, height: 60 },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.78)', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 100, overflowY: 'auto', padding: '16px 0' },
   box: { background: '#1e1e2e', border: '2px solid #333', borderRadius: 18, padding: 'clamp(20px, 4vw, 36px) clamp(24px, 5vw, 44px)', textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 14, maxWidth: 360, width: '90%' },
   oEmoji:    { fontSize: 'clamp(36px, 8vw, 56px)' },
