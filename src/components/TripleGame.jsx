@@ -114,7 +114,7 @@ function drawCard(ctx, x, y, type, blocked, w = CW, h = CH, pulse = 0) {
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
   ctx.fillStyle = '#000'
-  ctx.fillText(type, x, y + h * 0.05)
+  ctx.fillText(type, x, y + h * 0.04)
   ctx.restore()
 }
 
