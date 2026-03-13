@@ -56,6 +56,13 @@ const GAMES = [
     available: true,
   },
   {
+    id: 'maze',
+    emoji: '🌀',
+    name: '미로 탈출',
+    desc: '출구를 찾아 탈출해요!',
+    available: true,
+  },
+  {
     id: 'drawing',
     emoji: '🎨',
     name: '그림 그리기',
