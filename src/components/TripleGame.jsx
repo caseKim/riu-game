@@ -1,14 +1,14 @@
 import { useRef, useEffect, useState } from 'react'
-import { getBest, saveBest, getSavedDiff, saveDiff, fillRoundRect } from '../utils/gameUtils'
+import { getBest, saveBest, getSavedDiff, saveDiff, fillRoundRect, randInt } from '../utils/gameUtils'
 
 const W = 480, H = 700
 const GAME_ID = 'triple'
 
-const CW = 50, CH = 54, CR = 7    // board card (smaller)
-const GX = 40, GY = 45            // grid step
+const CW = 58, CH = 62, CR = 7    // board card
+const GX = 48, GY = 52            // grid step
 const BOARD_TOP = 50, BOARD_BOT = 590
 const MAX_HAND = 7
-const SW = 50, SH = 54            // slot card
+const SW = 54, SH = 58            // slot card
 
 const EMOJIS = ['🍎','🍊','🍋','🍇','🍓','🍑','🍒','🥝','🌸','⭐','🎯','🔥','💎','🎸','🌙','🦋']
 
@@ -47,9 +47,16 @@ function rrPathFixed(ctx, x, y, w, h, r) {
   ctx.closePath()
 }
 
+function pickGrid(n) {
+  const opts = n <= 16 ? [[4,3],[3,4]]
+             : n <= 32 ? [[6,3],[5,4],[4,5]]
+             : n <= 50 ? [[7,4],[6,5],[5,6]]
+             :           [[9,4],[8,5],[7,6]]
+  return opts[randInt(0, opts.length - 1)]
+}
+
 function makeSpots(n) {
-  const BC = n <= 16 ? 4 : n <= 32 ? 6 : n <= 50 ? 7 : 8
-  const BR = n <= 16 ? 3 : n <= 32 ? 3 : 4
+  const [BC, BR] = pickGrid(n)
   const maxL = Math.min(BC, BR)
   const extW = (BC - 1) * GX + (maxL - 1) * GX / 2
   const ox = (W - extW) / 2
@@ -101,15 +108,15 @@ function drawCard(ctx, x, y, type, blocked, w = CW, h = CH, pulse = 0) {
     ctx.shadowBlur   = pulse > 0.1 ? 4 + pulse * 12 : 6
     ctx.shadowOffsetY = 3
   }
-  ctx.fillStyle = blocked ? '#3a3a52' : '#fffff2'
+  ctx.fillStyle = blocked ? '#505068' : '#fffff2'
   rrPathFixed(ctx, x - w / 2, y - h / 2, w, h, CR)
   ctx.fill()
   ctx.shadowColor = 'transparent'; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0
-  ctx.strokeStyle = blocked ? '#6060a0' : (pulse > 0.5 ? '#ffe066' : '#ccccaa')
+  ctx.strokeStyle = blocked ? '#8080b8' : '#ccccaa'
   ctx.lineWidth = blocked ? 1 : 1.5
   rrPathFixed(ctx, x - w / 2, y - h / 2, w, h, CR)
   ctx.stroke()
-  ctx.globalAlpha = blocked ? 0.65 : 1
+  ctx.globalAlpha = blocked ? 0.82 : 1
   ctx.font = `${w * 0.7}px serif`
   ctx.textAlign = 'center'
   ctx.textBaseline = 'middle'
@@ -233,6 +240,16 @@ export default function TripleGame({ onBack, onStart }) {
   if (stateRef.current == null) {
     stateRef.current = { board: makeBoard(difficulty), hand: [], sets: 0, anims: [], frame: 0 }
   }
+
+  // DPR 대응: 고해상도 디스플레이에서 선명하게
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const dpr = window.devicePixelRatio || 1
+    canvas.width = W * dpr
+    canvas.height = H * dpr
+    canvas.getContext('2d').scale(dpr, dpr)
+  }, [])
 
   useEffect(() => {
     if (phase !== 'playing') return
@@ -399,7 +416,7 @@ export default function TripleGame({ onBack, onStart }) {
       <p style={S.subtitle}>{difficulty.emoji} {difficulty.label} · {score}세트</p>
 
       <div ref={wrapRef} style={S.gameArea}>
-        <canvas ref={canvasRef} width={W} height={H} style={S.canvas} />
+        <canvas ref={canvasRef} style={S.canvas} />
 
         <div style={S.scoreCard}>
           <div style={S.scoreRow}>
