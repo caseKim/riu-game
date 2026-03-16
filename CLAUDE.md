@@ -47,7 +47,9 @@ App
  ├── PlatformGame        (gameId === 'platform')
  ├── FishingGame         (gameId === 'fishing')
  ├── WaveGame            (gameId === 'wave')
- └── WhackGame           (gameId === 'mole')
+ ├── WhackGame           (gameId === 'mole')
+ ├── MazeGame            (gameId === 'maze')
+ └── TripleGame          (gameId === 'triple')
 ```
 
 ### Adding a new game
@@ -112,7 +114,7 @@ Single `requestAnimationFrame` loop in a `useEffect` that re-mounts when `phase`
 - Touch/click: non-passive `touchstart` + `onClick` both on `canvasWrapRef` — **not** on the canvas itself, because overlays cover the canvas in idle/gameover phases
 - Restart cooldown: `gameOverAtRef` prevents accidental restart when spacebar/touch is held through the moment of death
 
-### Key constants in `Game.jsx`
+### Key constants in `JumpGame.jsx`
 
 | Constant | Value | Purpose |
 |----------|-------|---------|
@@ -271,3 +273,70 @@ Best scores: `localStorage` keys `platform_best_easy`, `platform_best_normal`, `
 - `≥ 3000` — 밤 (dark + stars)
 
 Gradient is cached in `bgCache` module-level object; recreated only when threshold level changes.
+
+---
+
+## MazeGame.jsx
+
+### Overview
+
+Portrait canvas (640×720) maze escape game. Player navigates a procedurally generated maze to reach the exit. Score is time-based (faster = better). 5 difficulty levels control maze grid size.
+
+### Key constants
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `W / H` | 640 / 720 | Canvas dimensions |
+| `HUD_H` | 44 | HUD height at top |
+| `MAZE_PAD` | 8 | Padding around maze |
+
+### Difficulty settings (`DIFF_SETTINGS`)
+
+Each entry: `{ cols, rows }` — controls maze grid density.
+
+| ID | cols×rows | Label |
+|----|-----------|-------|
+| `easy` | 9×9 | 쉬움 |
+| `normal` | 13×13 | 보통 |
+| `hard` | 19×19 | 어려움 |
+| `vhard` | 25×25 | 매우어려움 |
+| `extreme` | 31×31 | 극한 |
+
+Best scores: `localStorage` keys `maze_best_{diffId}` — stored as milliseconds (lower is better, 0 = no record).
+
+### Controls
+
+- **Desktop**: ← → ↑ ↓ arrow keys / WASD
+- **Mobile**: virtual joystick
+
+---
+
+## TripleGame.jsx
+
+### Overview
+
+Portrait canvas (480×700) card-matching puzzle. Cards are laid out in a stacked grid; player taps cards to collect them into a 7-slot hand. Match 3 identical cards to clear them. Game over if hand fills up.
+
+### Key constants
+
+| Constant | Value | Purpose |
+|----------|-------|---------|
+| `W / H` | 480 / 700 | Canvas dimensions |
+| `MAX_HAND` | 7 | Max cards in hand before game over |
+| `CW / CH` | 58 / 62 | Board card width / height |
+| `GX / GY` | 48 / 52 | Grid step (x / y) |
+
+### Difficulty settings
+
+Each entry: `{ id, label, emoji, color, types, sets }` — `types` controls emoji variety, `sets` controls how many complete sets of 3 are in the deck.
+
+| ID | types | sets | Total cards |
+|----|-------|------|-------------|
+| `very_easy` | 4 | 1 | 12 |
+| `easy` | 5 | 2 | 30 |
+| `normal` | 7 | 2 | 42 |
+| `hard` | 9 | 2 | 54 |
+| `very_hard` | 11 | 2 | 66 |
+
+Best scores: `localStorage` keys `triple_best_{diffId}` (score = cards cleared).
+Difficulty: `localStorage` key `triple_diff`.
