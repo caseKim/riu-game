@@ -60,6 +60,37 @@ App
 4. Import and add to the `gameProps` block in `App.jsx`: `else if (gameId === 'your-id') screen = <YourGame {...gameProps} />`
 5. Call `onStart?.()` at the top of `startGame()` in your game component
 
+### Game UI shell — MUST follow exactly
+
+Every game must use this layout skeleton. **Do not deviate** — this is what keeps all games visually consistent.
+
+```
+<div style={S.wrapper}>                          ← flex col, alignItems center, justifyContent CENTER
+  <div style={S.topBar}>                         ← full width, maxWidth W
+    <button style={S.backBtn}>← 나가기</button>
+  </div>
+  <h1 style={S.title}>...</h1>
+  <p style={S.subtitle}>...</p>
+
+  <div ref={wrapRef} style={S.gameArea}>         ← position relative, width 100%, maxWidth W, margin 0 auto
+    <canvas ... style={S.canvas} />              ← border: 4px solid #FFD700, borderRadius: 12px 12px 0 0
+    <div style={S.scoreCard}>...</div>           ← borderTop: none, borderRadius: 0 0 12px 12px
+
+    {phase === 'idle'     && <div style={S.overlay}><div style={S.box}>...</div></div>}
+    {phase === 'gameover' && <div style={S.overlay}><div style={S.box}>...</div></div>}
+  </div>
+</div>
+```
+
+**Critical rules:**
+- `wrapper` **must** have `justifyContent: 'center'` — without it content sticks to the top
+- `gameArea` must be `position: relative` only — do NOT add flex/column/gap here
+- Canvas (or its DOM equivalent) gets the gold border `4px solid #FFD700` + top-rounded corners
+- `scoreCard` sits directly below with `borderTop: 'none'` + bottom-rounded corners — they visually connect
+- Overlays use `position: fixed, inset: 0` so they cover the whole screen
+
+**Non-canvas games** (DOM-based like MemoryGame): wrap the interactive area in a `div` that mimics the canvas style (`border: 4px solid #FFD700`, `borderRadius: 12px 12px 0 0`), then put `scoreCard` directly below it. The `S` object in `GameTemplate.jsx` is the source of truth for all style values.
+
 ### Game component interface
 
 All games receive `{ onBack, onStart }` props from App.jsx via `gameProps`:

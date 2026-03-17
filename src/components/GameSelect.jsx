@@ -70,6 +70,20 @@ const GAMES = [
     available: true,
   },
   {
+    id: 'catch',
+    emoji: '🧺',
+    name: '낙하물 받기',
+    desc: '바구니로 과일을 받아요!',
+    available: true,
+  },
+  {
+    id: 'memory',
+    emoji: '🧠',
+    name: '기억력 게임',
+    desc: '순서를 기억하고 따라해요!',
+    available: true,
+  },
+  {
     id: 'drawing',
     emoji: '🎨',
     name: '그림 그리기',

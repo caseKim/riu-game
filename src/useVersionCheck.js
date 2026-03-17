@@ -11,7 +11,7 @@ export function initVersionCheck(onUpdate) {
 }
 
 export async function checkVersion() {
-  if (CURRENT === 'dev' || !_onUpdate) return
+  if (import.meta.env.DEV || CURRENT === 'dev' || !_onUpdate) return
   const now = Date.now()
   if (now - _lastCheck < MIN_INTERVAL) return
   _lastCheck = now
