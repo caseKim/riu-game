@@ -131,22 +131,25 @@ export default function CatchGame({ onBack, onStart }) {
     const el = wrapRef.current
     if (!el) return
 
-    function getCanvasX(clientX) {
-      const rect = canvasRef.current.getBoundingClientRect()
-      return (clientX - rect.left) * (W / rect.width)
-    }
+    let touchOffsetX = 0
+    let cachedRect = null
+    let cachedScale = 1
 
     function onTouchStart(e) {
       if (e.target.closest('button')) return
       e.preventDefault()
       if (phase !== 'playing') { startGame(); return }
-      stateRef.current.basketX = clamp(getCanvasX(e.touches[0].clientX), BASKET_W / 2, W - BASKET_W / 2)
+      cachedRect = canvasRef.current.getBoundingClientRect()
+      cachedScale = W / cachedRect.width
+      const cx = (e.touches[0].clientX - cachedRect.left) * cachedScale
+      touchOffsetX = cx - stateRef.current.basketX
     }
 
     function onTouchMove(e) {
       if (phase !== 'playing') return
       e.preventDefault()
-      stateRef.current.basketX = clamp(getCanvasX(e.touches[0].clientX), BASKET_W / 2, W - BASKET_W / 2)
+      const cx = (e.touches[0].clientX - cachedRect.left) * cachedScale
+      stateRef.current.basketX = clamp(cx - touchOffsetX, BASKET_W / 2, W - BASKET_W / 2)
     }
 
     function onClick(e) {
