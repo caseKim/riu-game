@@ -84,6 +84,13 @@ const GAMES = [
     available: true,
   },
   {
+    id: 'fishbattle',
+    emoji: '🐟',
+    name: '낚시 배틀',
+    desc: '물고기를 빠르게 탭해서 잡아요!',
+    available: true,
+  },
+  {
     id: 'slide',
     emoji: '🧩',
     name: '그림 맞추기',
