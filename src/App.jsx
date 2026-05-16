@@ -14,6 +14,7 @@ import MazeGame from './components/MazeGame'
 import TripleGame from './components/TripleGame'
 import CatchGame from './components/CatchGame'
 import MemoryGame from './components/MemoryGame'
+import SlideGame from './components/SlideGame'
 
 export default function App() {
   const [gameId, setGameId] = useState(null)
@@ -54,6 +55,7 @@ export default function App() {
   else if (gameId === 'triple')   screen = <TripleGame {...gameProps} />
   else if (gameId === 'catch')    screen = <CatchGame {...gameProps} />
   else if (gameId === 'memory')   screen = <MemoryGame {...gameProps} />
+  else if (gameId === 'slide')    screen = <SlideGame {...gameProps} />
   else                            screen = <JumpGame {...gameProps} />
 
   return <>{updateBanner}{screen}</>

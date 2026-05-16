@@ -84,6 +84,13 @@ const GAMES = [
     available: true,
   },
   {
+    id: 'slide',
+    emoji: '🧩',
+    name: '그림 맞추기',
+    desc: '타일을 밀어서 순서대로!',
+    available: true,
+  },
+  {
     id: 'drawing',
     emoji: '🎨',
     name: '그림 그리기',
