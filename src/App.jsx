@@ -16,6 +16,7 @@ import CatchGame from './components/CatchGame'
 import MemoryGame from './components/MemoryGame'
 import SlideGame from './components/SlideGame'
 import FishBattle from './components/FishBattle'
+import BrickGame from './components/BrickGame'
 
 export default function App() {
   const [gameId, setGameId] = useState(null)
@@ -58,6 +59,7 @@ export default function App() {
   else if (gameId === 'memory')   screen = <MemoryGame {...gameProps} />
   else if (gameId === 'slide')      screen = <SlideGame {...gameProps} />
   else if (gameId === 'fishbattle') screen = <FishBattle {...gameProps} />
+  else if (gameId === 'brick')      screen = <BrickGame {...gameProps} />
   else                            screen = <JumpGame {...gameProps} />
 
   return <>{updateBanner}{screen}</>

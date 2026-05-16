@@ -84,6 +84,13 @@ const GAMES = [
     available: true,
   },
   {
+    id: 'brick',
+    emoji: '🧱',
+    name: '벽돌 깨기',
+    desc: '공을 튕겨서 벽돌을 부숴요!',
+    available: true,
+  },
+  {
     id: 'fishbattle',
     emoji: '🐟',
     name: '낚시 배틀',
